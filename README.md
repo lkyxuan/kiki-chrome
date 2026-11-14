@@ -27,7 +27,8 @@ Install it in every Chrome profile you want Kiki to use (for example one profile
 
 ```sh
 npm test        # unit tests (protocol, keys, injected functions)
-npm i && npm run smoke   # loads the extension into Playwright Chromium and runs every action against a test page
+npm i && npx playwright install chromium   # once
+npm run smoke   # loads the extension into Playwright Chromium and runs every action against a test page
 ```
 
 ## License

@@ -25,7 +25,15 @@ async function setStatus(state, detail = "") {
 
 // ---------- connection ----------
 
-async function connect() {
+// Only one connection attempt at a time: settings are read asynchronously, so two callers
+// (popup save fires both the storage listener and the reconnect message) could otherwise both open a socket.
+let connecting = null;
+function connect() {
+  connecting ??= doConnect().finally(() => (connecting = null));
+  return connecting;
+}
+
+async function doConnect() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
   clearTimeout(retryTimer);
   const s = await settings();
@@ -60,18 +68,28 @@ async function connect() {
 
 function scheduleRetry() {
   clearTimeout(retryTimer);
-  retryTimer = setTimeout(connect, backoff(attempt++));
+  retryTimer = setTimeout(() => connect(), backoff(attempt++));
 }
 
+// Reconnects run one after another, each waiting for any attempt in flight, so the newest settings win
+// and no superseded socket is left alive.
+let chain = Promise.resolve();
 function reconnect() {
-  attempt = 0;
-  if (ws) {
-    const old = ws;
-    ws = null;
-    old.onclose = null;
-    old.close();
-  }
-  connect();
+  chain = chain.then(async () => {
+    await connecting;
+    attempt = 0;
+    clearTimeout(retryTimer);
+    clearInterval(beat);
+    if (ws) {
+      const old = ws;
+      ws = null;
+      old.onclose = null;
+      old.onmessage = null;
+      old.close();
+    }
+    await connect();
+  });
+  return chain;
 }
 
 async function onMessage(sock, data) {
@@ -104,14 +122,20 @@ async function onMessage(sock, data) {
 // ---------- tab group: we only touch tabs we opened ----------
 
 async function groupId() {
-  const { group } = await chrome.storage.session.get("group");
+  const { group } = await chrome.storage.local.get("group");
   if (group !== undefined) {
     try {
       await chrome.tabGroups.get(group);
       return group;
     } catch {
-      /* group was closed */
+      /* closed, or Chrome restarted and restored the group under a new id */
     }
+  }
+  // after a browser restart Chrome restores our group with a new id: adopt it by title
+  const [found] = await chrome.tabGroups.query({ title: GROUP_TITLE });
+  if (found) {
+    await chrome.storage.local.set({ group: found.id });
+    return found.id;
   }
   return undefined;
 }
@@ -128,7 +152,7 @@ async function addToGroup(tabId) {
   if (g !== undefined) return chrome.tabs.group({ groupId: g, tabIds: [tabId] });
   const id = await chrome.tabs.group({ tabIds: [tabId] });
   await chrome.tabGroups.update(id, { title: GROUP_TITLE, color: "orange" });
-  await chrome.storage.session.set({ group: id });
+  await chrome.storage.local.set({ group: id });
   return id;
 }
 
@@ -282,8 +306,8 @@ async function run(action, p) {
 
 // ---------- lifecycle ----------
 
-chrome.runtime.onStartup.addListener(connect);
-chrome.runtime.onInstalled.addListener(connect);
+chrome.runtime.onStartup.addListener(() => connect());
+chrome.runtime.onInstalled.addListener(() => connect());
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && (changes.account || changes.token || changes.server)) reconnect();
 });

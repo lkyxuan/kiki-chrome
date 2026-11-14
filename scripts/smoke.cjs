@@ -59,5 +59,11 @@ const PAGE = `<!doctype html><title>Test page</title>
   console.log("foreign tab:", JSON.stringify(await call("click", { tabId: otherId, ref: 1 })));
   console.log("bad action:", JSON.stringify(await call("rm", {})));
   console.log("close:", JSON.stringify(await call("close", { tabId })));
-  await ctx.close(); wss.close(); web.close(); process.exit(0);
+  // saving in the popup fires the storage listener and a reconnect message together: must end with one live socket
+  await sw.evaluate(async () => { await chrome.storage.local.set({ account: "推特-测试号2" }); chrome.runtime.sendMessage({ type: "reconnect" }).catch(() => {}); });
+  await new Promise((r) => setTimeout(r, 2500));
+  const live = [...wss.clients].filter((c) => c.readyState === 1).length;
+  console.log("live sockets after save:", live, live === 1 ? "OK" : "FAIL");
+  if (live !== 1) process.exitCode = 1;
+  await ctx.close(); wss.close(); web.close(); process.exit(process.exitCode || 0);
 })().catch((e) => { console.error("FAIL", e); process.exit(1); });
