@@ -1,6 +1,6 @@
 // Service worker: keeps one WebSocket to Kiki on this Mac and runs the actions Kiki sends,
 // only inside tabs this extension opened (the "Kiki" tab group).
-import { ACTIONS, DEBUGGER_IDLE_MS, DEFAULT_SERVER, GROUP_TITLE, HEARTBEAT_MS, backoff, fail, hello, keyEvent, ok, parseCall, validAccount } from "./protocol.js";
+import { ACTIONS, DEBUGGER_IDLE_MS, DEFAULT_SERVER, GROUP_TITLE, HEARTBEAT_MS, backoff, fail, hello, keyEvent, ok, parseCall, validName } from "./protocol.js";
 import { locate, snapshotPage } from "./page.js";
 
 const VERSION = chrome.runtime.getManifest().version;
@@ -12,8 +12,8 @@ let beat = null;
 // ---------- settings & status ----------
 
 async function settings() {
-  const s = await chrome.storage.local.get(["account", "token", "server"]);
-  return { account: s.account || "", token: s.token || "", server: s.server || DEFAULT_SERVER };
+  const s = await chrome.storage.local.get(["name", "token", "server"]);
+  return { name: s.name || "", token: s.token || "", server: s.server || DEFAULT_SERVER };
 }
 
 async function setStatus(state, detail = "") {
@@ -37,8 +37,8 @@ async function doConnect() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
   clearTimeout(retryTimer);
   const s = await settings();
-  if (!validAccount(s.account) || !s.token) {
-    await setStatus("off", "fill in account name and pairing code");
+  if (!validName(s.name) || !s.token) {
+    await setStatus("off", "fill in a name and the pairing code");
     return;
   }
   await setStatus("connecting");
@@ -51,7 +51,7 @@ async function doConnect() {
   }
   ws = sock;
   sock.onopen = () => {
-    sock.send(JSON.stringify(hello({ token: s.token, account: s.account, version: VERSION })));
+    sock.send(JSON.stringify(hello({ token: s.token, name: s.name, version: VERSION })));
     clearInterval(beat);
     beat = setInterval(() => sock.readyState === WebSocket.OPEN && sock.send('{"type":"ping"}'), HEARTBEAT_MS);
   };
@@ -309,7 +309,7 @@ async function run(action, p) {
 chrome.runtime.onStartup.addListener(() => connect());
 chrome.runtime.onInstalled.addListener(() => connect());
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && (changes.account || changes.token || changes.server)) reconnect();
+  if (area === "local" && (changes.name || changes.token || changes.server)) reconnect();
 });
 // backstop: if the worker was stopped, the alarm wakes it and we reconnect
 chrome.alarms.create("kiki-keepalive", { periodInMinutes: 0.5 });

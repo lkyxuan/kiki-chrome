@@ -1,14 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ACTIONS, backoff, keyEvent, looksLikePublish, parseCall, validAccount } from "../src/protocol.js";
+import { ACTIONS, backoff, keyEvent, looksLikePublish, parseCall, validName } from "../src/protocol.js";
 
-test("account names: letters in any script, digits, - and _", () => {
-  assert.ok(validAccount("推特-品牌号"));
-  assert.ok(validAccount("x_brand-2"));
-  assert.ok(!validAccount(""));
-  assert.ok(!validAccount("has space"));
-  assert.ok(!validAccount("a/b"));
-  assert.ok(!validAccount("x".repeat(41)));
+test("browser names: letters in any script, digits, - and _", () => {
+  assert.ok(validName("推特-品牌号"));
+  assert.ok(validName("x_brand-2"));
+  assert.ok(!validName(""));
+  assert.ok(!validName("has space"));
+  assert.ok(!validName("a/b"));
+  assert.ok(!validName("x".repeat(41)));
 });
 
 test("parseCall accepts a good call", () => {

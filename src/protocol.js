@@ -23,8 +23,8 @@ export const ACTIONS = {
   eval: { tab: true, need: ["expression"] },
 };
 
-/** Account names look like "x-brand" or "推特-品牌号": letters (any script), digits, - and _. */
-export const validAccount = (s) => typeof s === "string" && /^[\p{L}\p{N}_-]{1,40}$/u.test(s);
+/** Browser names look like "mac-mini-1" or "工作浏览器": letters (any script), digits, - and _. */
+export const validName = (s) => typeof s === "string" && /^[\p{L}\p{N}_-]{1,40}$/u.test(s);
 
 /** Parse one message from Kiki. Returns { id, action, params } or throws with a reason Kiki can show. */
 export function parseCall(raw) {
@@ -50,7 +50,7 @@ export function parseCall(raw) {
   return { id: m.id, action: m.action, params };
 }
 
-export const hello = ({ token, account, version }) => ({ type: "hello", protocol: PROTOCOL_VERSION, token, account, version });
+export const hello = ({ token, name, version }) => ({ type: "hello", protocol: PROTOCOL_VERSION, token, name, version });
 export const ok = (id, result) => ({ type: "result", id, ok: true, result });
 export const fail = (id, err) => ({ type: "result", id, ok: false, error: String(err?.message || err) });
 
