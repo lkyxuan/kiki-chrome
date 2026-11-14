@@ -1,0 +1,15 @@
+{
+  "name": "kiki-chrome",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Chrome extension that lets Kiki drive your browser profiles, one account per profile.",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "smoke": "node scripts/smoke.cjs"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "ws": "^8.18.0"
+  }
+}
