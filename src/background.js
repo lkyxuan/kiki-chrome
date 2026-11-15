@@ -25,6 +25,13 @@ async function setStatus(state, detail = "") {
 
 // ---------- connection ----------
 
+const CLOSE_REASONS = {
+  4001: "配对码不对，到 Kiki 设置 → 浏览器 里重新复制",
+  4002: "名字不行：只用文字、数字、- 和 _",
+  4003: "在 Kiki 里被删掉了，点连接重新加上",
+  4004: "另一个 Profile 也叫这个名字，换一个名字",
+};
+
 // Only one connection attempt at a time: settings are read asynchronously, so two callers
 // (popup save fires both the storage listener and the reconnect message) could otherwise both open a socket.
 let connecting = null;
@@ -38,15 +45,15 @@ async function doConnect() {
   clearTimeout(retryTimer);
   const s = await settings();
   if (!validName(s.name) || !s.token) {
-    await setStatus("off", "fill in a name and the pairing code");
+    await setStatus("off", "填上名字和配对码");
     return;
   }
   await setStatus("connecting");
   let sock;
   try {
     sock = new WebSocket(s.server);
-  } catch (e) {
-    await setStatus("error", String(e.message || e));
+  } catch {
+    await setStatus("error", "Kiki 地址不对，应该像 ws://127.0.0.1:4567/ext");
     return scheduleRetry();
   }
   ws = sock;
@@ -59,9 +66,11 @@ async function doConnect() {
   sock.onclose = (ev) => {
     clearInterval(beat);
     if (ws === sock) ws = null;
-    // 4001 = Kiki refused the pairing code; retrying will not help until the user fixes it
-    if (ev.code === 4001) return setStatus("error", ev.reason || "pairing code refused");
-    setStatus("error", ev.reason || "Kiki not reachable");
+    // Codes Kiki sends when retrying will not help until the user changes something.
+    // 4004 must not retry either: two Profiles with the same name would keep kicking each other off.
+    const fatal = CLOSE_REASONS[ev.code];
+    if (fatal) return setStatus("error", fatal);
+    setStatus("error", "连不上 Kiki：确认 Kiki 开着，地址没填错");
     scheduleRetry();
   };
 }
@@ -101,7 +110,7 @@ async function onMessage(sock, data) {
   }
   if (msg.type === "welcome") {
     attempt = 0;
-    return setStatus("connected", msg.name ? `Kiki: ${msg.name}` : "");
+    return setStatus("connected", msg.name || "");
   }
   if (msg.type === "pong") return;
   if (msg.type !== "call") return;
