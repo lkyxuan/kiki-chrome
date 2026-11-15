@@ -1,5 +1,36 @@
 # kiki-chrome
 
-Chrome extension that lets [Kiki](https://getkiki.ai) drive your browser profiles, one account per profile.
+Chrome extension that lets [Kiki](https://getkiki.ai) use your Chrome profiles as browsers it can drive.
 
-Work in progress.
+Install it in every Chrome profile you want Kiki to use. Each copy connects to Kiki on the same Mac under a name you give it (for example `浏览器1`), so a team member can say "open this in `浏览器1`" and the action runs in that profile, with the logins that are already there. The extension is only a browser tool: which profile holds which account, and how to post on each site, is up to the team member using it.
+
+## Install (developer mode, for now)
+
+1. Download this repo (or `git clone` it).
+2. In each Chrome profile: open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, pick this folder.
+3. Click the Kiki icon in the toolbar, fill in:
+   - **Name**: what Kiki calls this browser, e.g. `浏览器1`. Different in every profile.
+   - **Pairing code**: copy it from Kiki → Settings → Browsers.
+4. The icon shows no badge when connected, `…` while connecting and `!` when it cannot reach Kiki.
+
+## How it works
+
+- The service worker keeps one WebSocket to Kiki (`ws://127.0.0.1:4567/ext` by default), sends `hello` with the browser name and pairing code, and pings every 20 s (Chrome 116+ keeps a worker alive while WebSocket traffic flows). If Kiki is not running it retries with backoff; an alarm every 30 s is the backstop.
+- Kiki sends `{type:"call", id, action, params}`; the extension answers `{type:"result", id, ok, result|error}`.
+- Actions: `tabs`, `open`, `navigate`, `close`, `snapshot`, `describe`, `click`, `type`, `key`, `scroll`, `upload`, `screenshot`, `eval`. See `src/protocol.js`.
+- **Only tabs it opened.** Every tab Kiki opens goes into an orange **Kiki** tab group. Actions on any other tab are refused, so your own tabs in that profile are never touched.
+- Clicks, typing and file uploads go through `chrome.debugger` (real input events, works on sites that ignore synthetic events). While it is attached Chrome shows "Kiki started debugging this browser"; it detaches after 30 s without actions.
+- `snapshot` lists clickable / typeable elements with a number (`ref`) and the page text; later actions use the `ref`.
+- Kiki, not the extension, decides whether a click or an Enter needs your approval (posting, sending, replying). It calls `describe` first to see what the button says.
+
+## Develop
+
+```sh
+npm test        # unit tests (protocol, keys, injected functions)
+npm i && npx playwright install chromium   # once
+npm run smoke   # loads the extension into Playwright Chromium and runs every action against a test page
+```
+
+## License
+
+MIT
