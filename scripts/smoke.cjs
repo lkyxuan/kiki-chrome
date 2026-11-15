@@ -21,6 +21,7 @@ const PAGE = `<!doctype html><title>Test page</title>
   const connected = new Promise((res) => wss.on("connection", (s) => {
     s.on("message", (d) => {
       const m = JSON.parse(d);
+      if (m.type === "hello" && m.token === "bad") return s.close(4001, "pairing code refused");
       if (m.type === "hello") { helloMsg = m; sock = s; s.send(JSON.stringify({ type: "welcome", name: "test" })); res(); }
       if (m.type === "result") { pending.get(m.id)(m); pending.delete(m.id); }
     });
@@ -65,5 +66,21 @@ const PAGE = `<!doctype html><title>Test page</title>
   const live = [...wss.clients].filter((c) => c.readyState === 1).length;
   console.log("live sockets after save:", live, live === 1 ? "OK" : "FAIL");
   if (live !== 1) process.exitCode = 1;
+  // popup: clicking 连接 shows progress, then 连上了 and closes; a wrong code says so and offers 重新连接
+  const extId = sw.url().split("/")[2];
+  const pop = await ctx.newPage();
+  await pop.goto(`chrome-extension://${extId}/popup.html`);
+  await pop.fill("#name", "浏览器3"); await pop.fill("#token", "abc");
+  const closed = pop.waitForEvent("close", { timeout: 5000 }).then(() => true, () => false);
+  await pop.click("#save");
+  const sawOk = await pop.waitForFunction(() => document.getElementById("save").textContent.includes("连上了"), null, { timeout: 5000 }).then(() => true, () => false);
+  console.log("popup connected:", sawOk ? "OK" : "FAIL", "| closed itself:", (await closed) ? "OK" : "no (tab not opened by script)");
+  if (!sawOk) process.exitCode = 1;
+  const pop2 = await ctx.newPage();
+  await pop2.goto(`chrome-extension://${extId}/popup.html`);
+  await pop2.fill("#token", "bad"); await pop2.click("#save");
+  const sawErr = await pop2.waitForFunction(() => document.getElementById("status").textContent.includes("配对码不对") && document.getElementById("save").textContent === "重新连接", null, { timeout: 5000 }).then(() => true, () => false);
+  console.log("popup bad code:", sawErr ? "OK" : "FAIL", "|", await pop2.textContent("#status"));
+  if (!sawErr) process.exitCode = 1;
   await ctx.close(); wss.close(); web.close(); process.exit(process.exitCode || 0);
 })().catch((e) => { console.error("FAIL", e); process.exit(1); });
