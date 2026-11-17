@@ -124,20 +124,33 @@ addEventListener("click",e=>{seen.trusted&&=e.isTrusted},true);</script>`;
   const popOk = await until(async () => (await pop3.textContent("#status")).includes("这个浏览器叫「浏览器7」"));
   last.close(1001, "Kiki restarting"); // Kiki restarts: the extension comes back on its own, with the key
   const rekeyed = await until(() => hellos.some((m) => m.key === "K1" && m.name === "浏览器7" && m.install === h1.install));
-  const approveOk = kept && popOk && rekeyed;
-  console.log("approved, key kept, reconnects with key:", approveOk ? "OK" : "FAIL", JSON.stringify({ kept, popOk, rekeyed, hellos: hellos.length }));
+  const popName = await pop3.inputValue("#name"); // popup open while approved: shows Kiki's name, so saving keeps it
+  const approveOk = kept && popOk && rekeyed && popName === "浏览器7";
+  console.log("approved, key kept, reconnects with key:", approveOk ? "OK" : "FAIL", JSON.stringify({ kept, popOk, rekeyed, popName, hellos: hellos.length }));
   // refused in Kiki: stops asking until 连接 is clicked
   await sw2.evaluate(() => chrome.storage.local.remove("key"));
   last.close(1001, "Kiki restarting");
   await until(() => hellos.length >= 3 && !hellos.at(-1).key);
   last.close(4005, "refused in Kiki");
-  const refused = await until(async () => (await sw2.evaluate(() => chrome.storage.local.get("refused"))).refused === true);
+  const refused = await until(async () => (await sw2.evaluate(() => chrome.storage.local.get("refused"))).refused === 4005);
   const n = hellos.length;
   await sw2.evaluate(() => chrome.storage.local.set({ server: "ws://127.0.0.1:8713/ext?again" })); // forces a reconnect attempt
   await new Promise((r) => setTimeout(r, 1500));
   const quiet = hellos.length === n;
   console.log("refused stays quiet:", refused && quiet ? "OK" : "FAIL");
-  if (!askOk || !waiting || !popWait || !approveOk || !refused || !quiet) process.exitCode = 1;
+  // removed in Kiki (4003): drops the key and stays quiet too, until 连接 is clicked
+  await sw2.evaluate(() => chrome.storage.local.set({ refused: 0, key: "K1", name: "浏览器7" }));
+  await sw2.evaluate(() => chrome.storage.local.set({ server: "ws://127.0.0.1:8713/ext" }));
+  await until(() => hellos.at(-1)?.key === "K1");
+  last.close(4003, "removed in Kiki");
+  const removed = await until(async () => { const v = await sw2.evaluate(() => chrome.storage.local.get(["refused", "key"])); return v.refused === 4003 && !v.key; });
+  const n2 = hellos.length;
+  await new Promise((r) => setTimeout(r, 1500));
+  await sw2.evaluate(() => chrome.storage.local.set({ server: "ws://127.0.0.1:8713/ext?again2" }));
+  await new Promise((r) => setTimeout(r, 1500));
+  const quiet2 = hellos.length === n2;
+  console.log("removed stays quiet:", removed && quiet2 ? "OK" : "FAIL");
+  if (!askOk || !waiting || !popWait || !approveOk || !refused || !quiet || !removed || !quiet2) process.exitCode = 1;
   await ctx2.close(); wss2.close();
   wss.close(); web.close(); process.exit(process.exitCode || 0);
 })().catch((e) => { console.error("FAIL", e); process.exit(1); });

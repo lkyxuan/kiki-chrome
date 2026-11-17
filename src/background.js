@@ -17,7 +17,7 @@ async function settings() {
     s.install = newInstallId();
     await chrome.storage.local.set({ install: s.install });
   }
-  return { name: s.name || "", token: s.token || "", server: s.server || DEFAULT_SERVER, key: s.key || "", install: s.install, refused: !!s.refused };
+  return { name: s.name || "", token: s.token || "", server: s.server || DEFAULT_SERVER, key: s.key || "", install: s.install, refused: s.refused || 0 };
 }
 
 async function setStatus(state, detail = "") {
@@ -57,9 +57,10 @@ async function doConnect() {
     await setStatus("off", "名字只用文字、数字、- 和 _");
     return;
   }
-  // Refused in Kiki: don't ask again on every Chrome start; clicking 连接 in the popup clears this
+  // Refused (4005) or removed (4003) in Kiki: don't ask again on every Chrome start or keepalive alarm;
+  // clicking 连接 in the popup clears this
   if (s.refused && !s.token && !s.key) {
-    await setStatus("off", CLOSE_REASONS[4005]);
+    await setStatus("off", CLOSE_REASONS[s.refused] || CLOSE_REASONS[4005]);
     return;
   }
   await setStatus("connecting");
@@ -82,8 +83,8 @@ async function doConnect() {
     if (ws === sock) ws = null;
     // Codes Kiki sends when retrying will not help until the user changes something.
     // 4004 must not retry either: two Profiles with the same name would keep kicking each other off.
-    if (ev.code === 4005) chrome.storage.local.set({ refused: true });
-    if (ev.code === 4003) chrome.storage.local.remove("key");
+    if (ev.code === 4005) chrome.storage.local.set({ refused: 4005 });
+    if (ev.code === 4003) chrome.storage.local.set({ refused: 4003, key: "" });
     if (ev.code === 4001 && !s.token) return setStatus("error", OLD_KIKI);
     const fatal = CLOSE_REASONS[ev.code];
     if (fatal) return setStatus("error", fatal);
@@ -129,7 +130,7 @@ async function onMessage(sock, data) {
     attempt = 0;
     // Approved in Kiki: keep the key and the name Kiki settled on, so the next start connects straight away
     // (the storage listener ignores name/key, so this does not trigger a reconnect)
-    if (msg.key) await chrome.storage.local.set({ key: msg.key, name: msg.name || "", refused: false });
+    if (msg.key) await chrome.storage.local.set({ key: msg.key, name: msg.name || "", refused: 0 });
     return setStatus("connected", msg.name || "");
   }
   if (msg.type === "pending") {

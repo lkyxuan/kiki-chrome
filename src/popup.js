@@ -4,6 +4,8 @@ const $ = (id) => document.getElementById(id);
 const LABEL = { connected: "已连上 Kiki", connecting: "正在连接…", waiting: "等你在 Kiki 里点同意", error: "没连上", off: "没连接" };
 const WAIT_MS = 10_000; // this long without "connected" after a click: say so instead of spinning forever
 
+let nameEdited = false; // the user typed in the name box: don't overwrite it with the name Kiki settled on
+$("name").addEventListener("input", () => (nameEdited = true));
 let clickedAt = 0; // set when the user clicks 连接; only status written after it counts as the answer
 let waitTimer;
 
@@ -64,8 +66,8 @@ $("save").onclick = async () => {
     button("重新连接");
     say("10 秒还没连上：确认这台电脑上 Kiki 开着、已经更新到最新版");
   }, WAIT_MS);
-  // clicking 连接 also takes back an earlier 拒绝 in Kiki, so the browser asks again
-  await chrome.storage.local.set({ name, token, server: $("server").value.trim() || DEFAULT_SERVER, refused: false });
+  // clicking 连接 also takes back an earlier 拒绝 / 删除 in Kiki, so the browser asks again
+  await chrome.storage.local.set({ name, token, server: $("server").value.trim() || DEFAULT_SERVER, refused: 0 });
   chrome.runtime.sendMessage({ type: "reconnect" });
 };
 
@@ -75,5 +77,9 @@ function say(text) {
   $("status").className = "err";
 }
 
-chrome.storage.onChanged.addListener((c, area) => area === "session" && c.status && show(c.status.newValue));
+chrome.storage.onChanged.addListener((c, area) => {
+  if (area === "session" && c.status) show(c.status.newValue);
+  // approved in Kiki while this popup is open: show the name Kiki settled on, so saving keeps it
+  if (area === "local" && c.name && !nameEdited) $("name").value = c.name.newValue || "";
+});
 load();
