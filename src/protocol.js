@@ -134,9 +134,20 @@ export const looksLikePublish = (name) => {
 // ---------- human-like input ----------
 // Pure planners; background.js turns their output into CDP Input events. `rand` is injectable for tests.
 
-/** Pick a point inside the middle 40% of an element's box instead of its exact centre. */
-export function clickPoint({ x, y, w = 0, h = 0 }, rand = Math.random) {
-  return { x: x + (rand() - 0.5) * w * 0.4, y: y + (rand() - 0.5) * h * 0.4 };
+/**
+ * Pick a point inside the middle 40% of the element's visible part instead of its exact centre.
+ * Elements taller or wider than the window are clipped to the viewport (`vw`/`vh`) first, so the point is on screen.
+ */
+export function clickPoint({ x, y, w = 0, h = 0, vw = Infinity, vh = Infinity }, rand = Math.random) {
+  const left = Math.max(x - w / 2, 0);
+  const right = Math.min(x + w / 2, vw);
+  const top = Math.max(y - h / 2, 0);
+  const bottom = Math.min(y + h / 2, vh);
+  const cx = right > left ? (left + right) / 2 : x;
+  const cy = bottom > top ? (top + bottom) / 2 : y;
+  const vw2 = Math.max(0, right - left);
+  const vh2 = Math.max(0, bottom - top);
+  return { x: cx + (rand() - 0.5) * vw2 * 0.4, y: cy + (rand() - 0.5) * vh2 * 0.4 };
 }
 
 /**

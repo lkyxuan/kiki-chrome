@@ -98,3 +98,11 @@ test("click point stays inside the element's middle", () => {
     assert.ok(Math.abs(p.x - 100) <= 16 && Math.abs(p.y - 50) <= 4);
   }
 });
+
+test("click point on an element taller than the window stays on screen", () => {
+  for (let i = 0; i < 50; i++) {
+    const p = clickPoint({ x: 400, y: 300, w: 600, h: 3000, vw: 1200, vh: 600 });
+    assert.ok(p.y >= 0 && p.y <= 600, String(p.y));
+    assert.ok(Math.abs(p.y - 300) <= 120);
+  }
+});
