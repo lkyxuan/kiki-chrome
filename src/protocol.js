@@ -130,3 +130,108 @@ export const looksLikePublish = (name) => {
   if (!s || s.length > 20) return false;
   return PUBLISH_WORDS.some((w) => s === w || s.startsWith(w) || s.endsWith(w));
 };
+
+// ---------- human-like input ----------
+// Pure planners; background.js turns their output into CDP Input events. `rand` is injectable for tests.
+
+/**
+ * Pick a point inside the middle 40% of the element's visible part instead of its exact centre.
+ * Elements taller or wider than the window are clipped to the viewport (`vw`/`vh`) first, so the point is on screen.
+ */
+export function clickPoint({ x, y, w = 0, h = 0, vw = Infinity, vh = Infinity }, rand = Math.random) {
+  const left = Math.max(x - w / 2, 0);
+  const right = Math.min(x + w / 2, vw);
+  const top = Math.max(y - h / 2, 0);
+  const bottom = Math.min(y + h / 2, vh);
+  const cx = right > left ? (left + right) / 2 : x;
+  const cy = bottom > top ? (top + bottom) / 2 : y;
+  const vw2 = Math.max(0, right - left);
+  const vh2 = Math.max(0, bottom - top);
+  return { x: cx + (rand() - 0.5) * vw2 * 0.4, y: cy + (rand() - 0.5) * vh2 * 0.4 };
+}
+
+/**
+ * Points a mouse passes through from `from` to `to`: a gently curved path (quadratic Bézier with a random
+ * bend), eased so it speeds up and slows down, ending exactly on `to`. Each point carries the pause before it.
+ */
+export function mousePath(from, to, rand = Math.random) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 2) return [{ x: to.x, y: to.y, wait: 0 }];
+  const steps = Math.max(6, Math.min(25, Math.round(dist / 40)));
+  const bend = (rand() - 0.5) * 0.5 * dist; // sideways offset of the control point
+  const cx = (from.x + to.x) / 2 - (dy / dist) * bend;
+  const cy = (from.y + to.y) / 2 + (dx / dist) * bend;
+  const pts = [];
+  for (let i = 1; i <= steps; i++) {
+    const s = i / steps;
+    const t = s < 0.5 ? 2 * s * s : 1 - (-2 * s + 2) ** 2 / 2; // ease in-out
+    const u = 1 - t;
+    let x = u * u * from.x + 2 * u * t * cx + t * t * to.x;
+    let y = u * u * from.y + 2 * u * t * cy + t * t * to.y;
+    if (i < steps) {
+      x += (rand() - 0.5) * 2;
+      y += (rand() - 0.5) * 2;
+    } else {
+      x = to.x;
+      y = to.y;
+    }
+    pts.push({ x, y, wait: 8 + Math.round(rand() * 10) });
+  }
+  return pts;
+}
+
+/** Typing has to finish inside Kiki's 60 s per-call timeout; keep well under it. */
+export const TYPING_BUDGET_MS = 40_000;
+
+const ASCII_TYPABLE = /^[\x20-\x7e]$/;
+
+/**
+ * Split text into keystrokes with pauses. Printable ASCII is typed key by key; other text (Chinese, emoji…)
+ * is committed a few characters at a time like an input method does; newlines are inserted as text rather
+ * than pressed as Enter, because Enter can submit a form (and posting must go through Kiki's approval).
+ * Long text gets bigger chunks and shorter pauses so the whole thing fits the budget.
+ * Returns [{ kind: "key", ch, wait } | { kind: "insert", text, wait }], `wait` = pause before that step.
+ */
+export function typingPlan(text, rand = Math.random) {
+  const chars = [...String(text)];
+  // ~90 ms average pause (incl. the odd longer one) + ~30 ms key hold + CDP round trips ≈ 120 ms a step;
+  // if that would blow the budget, group characters so the step count fits
+  const maxSteps = Math.floor(TYPING_BUDGET_MS / 120);
+  const group = Math.max(1, Math.ceil(chars.length / maxSteps));
+  const steps = [];
+  let i = 0;
+  while (i < chars.length) {
+    const ch = chars[i];
+    const wait = 30 + Math.round(rand() * 90) + (rand() < 0.04 ? 200 + Math.round(rand() * 300) : 0);
+    if (group === 1 && ASCII_TYPABLE.test(ch)) {
+      steps.push({ kind: "key", ch, wait });
+      i += 1;
+      continue;
+    }
+    // a run of non-key characters (or anything, once text is long): 1-3 characters, times the group size
+    const n = group * (1 + Math.floor(rand() * 3));
+    let j = i;
+    let chunk = "";
+    while (j < chars.length && j - i < n && (group > 1 || !ASCII_TYPABLE.test(chars[j]))) chunk += chars[j++];
+    steps.push({ kind: "insert", text: chunk, wait: group > 1 ? Math.min(wait, 60) : wait });
+    i = j;
+  }
+  return steps;
+}
+
+/** CDP key params for typing one printable ASCII character (no combo parsing: "+" is a character here). */
+export function charKeyEvent(ch) {
+  const up = ch.toUpperCase();
+  const isLetter = /[a-z]/i.test(ch);
+  const isDigit = /[0-9]/.test(ch);
+  return {
+    key: ch,
+    code: ch === " " ? "Space" : isLetter ? `Key${up}` : isDigit ? `Digit${ch}` : "",
+    windowsVirtualKeyCode: ch === " " ? 32 : isLetter || isDigit ? up.charCodeAt(0) : 0,
+    modifiers: /[A-Z]/.test(ch) ? 8 : 0,
+    text: ch,
+    unmodifiedText: ch,
+  };
+}

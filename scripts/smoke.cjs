@@ -12,7 +12,11 @@ const PAGE = `<!doctype html><title>Test page</title>
 <input id=t placeholder="写点什么"><button onclick="document.getElementById('out').textContent='got:'+document.getElementById('t').value">发布</button>
 <div contenteditable=true aria-label="正文"></div>
 <input type=file id=f style="display:none" onchange="document.getElementById('out2').textContent='file:'+this.files[0].name">
-<p id=out></p><p id=out2></p>`;
+<p id=out></p><p id=out2></p>
+<script>window.seen={keys:0,moves:0,trusted:true};
+addEventListener("keydown",e=>{seen.keys++;seen.trusted&&=e.isTrusted},true);
+addEventListener("mousemove",e=>{seen.moves++;seen.trusted&&=e.isTrusted},true);
+addEventListener("click",e=>{seen.trusted&&=e.isTrusted},true);</script>`;
 
 (async () => {
   const web = http.createServer((q, r) => { r.setHeader("content-type", "text/html; charset=utf-8"); r.end(PAGE); }).listen(8711);
@@ -52,6 +56,12 @@ const PAGE = `<!doctype html><title>Test page</title>
   console.log("upload:", JSON.stringify(await call("upload", { tabId, ref: file, files: [img] })));
   console.log("key:", JSON.stringify(await call("key", { tabId, key: "cmd+a" })));
   console.log("eval:", JSON.stringify(await call("eval", { tabId, expression: "document.getElementById('out').textContent + ' | ' + document.getElementById('out2').textContent + ' | ' + document.querySelector('[contenteditable]').innerText" })));
+  // human-like input: real key presses and a gliding mouse, all trusted, and nothing written into the page
+  const human = await call("eval", { tabId, expression: "JSON.stringify({...seen, marked: [...document.querySelectorAll('*')].filter(e => [...e.attributes].some(a => a.name.startsWith('data-k'))).length})" });
+  const h = JSON.parse(human.result.value);
+  const humanOk = h.trusted && h.keys >= 4 && h.moves >= 6 && h.marked === 0;
+  console.log("human input:", JSON.stringify(h), humanOk ? "OK" : "FAIL");
+  if (!humanOk) process.exitCode = 1;
   const shot = await call("screenshot", { tabId }); console.log("screenshot bytes:", shot.ok && shot.result.data.length);
   console.log("tabs:", JSON.stringify(await call("tabs")));
   // a tab we did not open must be refused

@@ -55,3 +55,54 @@ test("publish buttons are recognised, long text is not", () => {
   for (const w of ["发布", "发送", "Post", "Reply", "发布笔记", "立即发布"]) assert.ok(looksLikePublish(w), w);
   for (const w of ["", "首页", "Posts you liked and everything else that goes on", "Following"]) assert.ok(!looksLikePublish(w), w);
 });
+
+import { TYPING_BUDGET_MS, charKeyEvent, clickPoint, mousePath, typingPlan } from "../src/protocol.js";
+
+const seeded = (seed = 1) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+
+test("typing: ASCII key by key, other text in small runs, newline never pressed as Enter", () => {
+  const plan = typingPlan("Hi 你好世界\nok+", seeded());
+  assert.equal(plan.map((s) => s.ch ?? s.text).join(""), "Hi 你好世界\nok+");
+  assert.deepEqual(plan.filter((s) => s.kind === "key").map((s) => s.ch), ["H", "i", " ", "o", "k", "+"]);
+  for (const s of plan.filter((s) => s.kind === "insert")) assert.ok([...s.text].length <= 3, s.text);
+  assert.ok(plan.every((s) => s.wait >= 30));
+});
+
+test("typing: long text still fits the time budget and loses nothing", () => {
+  for (const text of ["字".repeat(5000), "a".repeat(3000), "mix 混合 ".repeat(400)]) {
+    const plan = typingPlan(text, seeded(7));
+    assert.equal(plan.map((s) => s.ch ?? s.text).join(""), text);
+    assert.ok(plan.length * 120 <= TYPING_BUDGET_MS + 120 * 3, `${plan.length} steps`);
+  }
+});
+
+test("charKeyEvent: '+' is a character, capitals hold shift", () => {
+  assert.equal(charKeyEvent("+").text, "+");
+  assert.deepEqual([charKeyEvent("A").modifiers, charKeyEvent("A").code], [8, "KeyA"]);
+  assert.equal(charKeyEvent(" ").code, "Space");
+});
+
+test("mouse path: curved, several steps, ends exactly on target", () => {
+  const pts = mousePath({ x: 10, y: 10 }, { x: 410, y: 310 }, seeded(3));
+  assert.ok(pts.length >= 6 && pts.length <= 25);
+  assert.deepEqual([pts.at(-1).x, pts.at(-1).y], [410, 310]);
+  // not a straight line: some middle point is off the direct segment
+  const off = pts.slice(1, -1).some((p) => Math.abs((p.y - 10) / 300 - (p.x - 10) / 400) > 0.02);
+  assert.ok(off);
+  assert.deepEqual(mousePath({ x: 5, y: 5 }, { x: 5, y: 6 }), [{ x: 5, y: 6, wait: 0 }]);
+});
+
+test("click point stays inside the element's middle", () => {
+  for (let i = 0; i < 50; i++) {
+    const p = clickPoint({ x: 100, y: 50, w: 80, h: 20 });
+    assert.ok(Math.abs(p.x - 100) <= 16 && Math.abs(p.y - 50) <= 4);
+  }
+});
+
+test("click point on an element taller than the window stays on screen", () => {
+  for (let i = 0; i < 50; i++) {
+    const p = clickPoint({ x: 400, y: 300, w: 600, h: 3000, vw: 1200, vh: 600 });
+    assert.ok(p.y >= 0 && p.y <= 600, String(p.y));
+    assert.ok(Math.abs(p.y - 300) <= 120);
+  }
+});
