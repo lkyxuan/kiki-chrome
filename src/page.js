@@ -31,6 +31,12 @@ export function snapshotPage(maxText) {
     if (t === "select") return "select";
     return t === "summary" || t === "label" ? t : "button";
   };
+  // custom elements (<xhs-publish-btn> and friends) that act as buttons: not matched by SEL,
+  // so take visible ones with a pointer cursor and nothing clickable of their own inside
+  const custom = (el) => {
+    if (!el.tagName.includes("-") || !visible(el) || getComputedStyle(el).cursor !== "pointer") return false;
+    return !el.querySelector(SEL) && !el.shadowRoot?.querySelector?.("input, textarea, select");
+  };
   const nameOf = (el) =>
     clean(el.getAttribute("aria-label")) ||
     clean(el.getAttribute("aria-labelledby") && document.getElementById(el.getAttribute("aria-labelledby"))?.innerText) ||
@@ -39,12 +45,18 @@ export function snapshotPage(maxText) {
     clean(el.getAttribute("placeholder") || el.getAttribute("data-placeholder")) ||
     clean(el.getAttribute("title")) ||
     clean(el.querySelector?.("img[alt]")?.alt) ||
-    clean(el.getAttribute("name"));
+    clean(el.getAttribute("name")) ||
+    clean(el.shadowRoot?.textContent); // a custom element's label often lives in its shadow DOM
   const elements = [];
   let n = 0;
-  for (const el of document.querySelectorAll(SEL)) {
+  // one walk in document order, so refs keep the page's reading order
+  const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_ELEMENT);
+  for (let el = walker.currentNode; el; el = walker.nextNode()) {
+    if (el.nodeType !== 1) continue;
+    const hit = el.matches(SEL);
+    if (!hit && !custom(el)) continue;
     // file inputs are often hidden behind a styled button; keep them so uploads work
-    if (!(el.type === "file" || visible(el))) continue;
+    if (hit && !(el.type === "file" || visible(el))) continue;
     n += 1;
     refs[n] = new WeakRef(el);
     const item = { ref: n, role: roleOf(el), name: nameOf(el) };
@@ -67,7 +79,7 @@ export function locate(ref) {
   if (!el || !el.isConnected) return { error: `no element ${ref}; take a new snapshot` };
   el.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
   const r = el.getBoundingClientRect();
-  const name = (el.getAttribute("aria-label") || el.innerText || el.value || el.getAttribute("placeholder") || el.getAttribute("title") || "")
+  const name = (el.getAttribute("aria-label") || el.innerText || el.value || el.getAttribute("placeholder") || el.getAttribute("title") || el.shadowRoot?.textContent || "")
     .replace(/\s+/g, " ").trim().slice(0, 80);
   return {
     x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height,
