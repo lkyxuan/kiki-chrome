@@ -1,0 +1,36 @@
+name: release
+# Push a tag like v0.1.2 and this packs the extension and publishes it on the Releases page.
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Tag must match manifest.json and package.json
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          m=$(node -p "require('./manifest.json').version")
+          p=$(node -p "require('./package.json').version")
+          if [ "$tag" != "$m" ] || [ "$tag" != "$p" ]; then
+            echo "tag $GITHUB_REF_NAME, manifest.json $m, package.json $p: bump both before tagging" >&2
+            exit 1
+          fi
+      - run: npm test
+      - name: Pack
+        id: pack
+        run: echo "zip=$(scripts/pack.sh)" >> "$GITHUB_OUTPUT"
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "${{ steps.pack.outputs.zip }}" \
+            --title "kiki-chrome $GITHUB_REF_NAME" \
+            --generate-notes \
+            --notes "下载 kiki-chrome-${GITHUB_REF_NAME#v}.zip，解压后在每个 Chrome Profile 的 chrome://extensions 里「加载已解压的扩展程序」选这个文件夹；升级就解压到原来的文件夹覆盖，再点刷新。"
