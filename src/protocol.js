@@ -24,7 +24,7 @@ export const ACTIONS = {
 };
 
 /** Browser names look like "mac-mini-1" or "工作浏览器": letters (any script), digits, - and _. */
-export const validName = (s) => typeof s === "string" && /^[\p{L}\p{N}_-]{1,40}$/u.test(s);
+export const validName = (s) => typeof s === "string" && /^[\p{L}\p{N}_-]{1,40}$/u.test(s) && !(s in Object.prototype); // same as Kiki: no "constructor", "__proto__"…
 
 /** Parse one message from Kiki. Returns { id, action, params } or throws with a reason Kiki can show. */
 export function parseCall(raw) {

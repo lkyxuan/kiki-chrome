@@ -9,6 +9,8 @@ test("browser names: letters in any script, digits, - and _", () => {
   assert.ok(!validName("has space"));
   assert.ok(!validName("a/b"));
   assert.ok(!validName("x".repeat(41)));
+  assert.ok(!validName("constructor"));
+  assert.ok(!validName("__proto__"));
 });
 
 test("parseCall accepts a good call", () => {
