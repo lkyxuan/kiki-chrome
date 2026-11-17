@@ -6,8 +6,8 @@ Install it in every Chrome profile you want Kiki to use. Each copy connects to K
 
 ## Install (developer mode, for now)
 
-1. Download this repo (or `git clone` it).
-2. In each Chrome profile: open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, pick this folder.
+1. Download `kiki-chrome-<version>.zip` from [Releases](https://github.com/lkyxuan/kiki-chrome/releases/latest) and unzip it somewhere it can stay (Chrome loads it from there).
+2. In each Chrome profile: open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, pick the unzipped folder.
 3. Click the Kiki icon in the toolbar, fill in:
    - **Name**: what Kiki calls this browser, e.g. `浏览器1`. Different in every profile.
    - **Pairing code**: copy it from Kiki → Settings → Browsers.
@@ -31,6 +31,16 @@ npm test        # unit tests (protocol, keys, injected functions)
 npm i && npx playwright install chromium   # once
 npm run smoke   # loads the extension into Playwright Chromium and runs every action against a test page
 ```
+
+## Release
+
+Bump `version` in both `manifest.json` and `package.json`, merge, then push a tag with the same version:
+
+```sh
+git tag v0.1.3 && git push origin v0.1.3
+```
+
+The `release` workflow checks the versions match, runs the tests, packs `kiki-chrome-<version>.zip` (`scripts/pack.sh`) and publishes it on Releases. To upgrade, unzip over the old folder and click reload on `chrome://extensions` in each profile.
 
 ## License
 
