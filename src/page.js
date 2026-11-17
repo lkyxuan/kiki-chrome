@@ -47,6 +47,7 @@ export function snapshotPage(maxText) {
     for (let t = w.nextNode(); t; t = w.nextNode()) {
       const p = t.parentElement;
       if (p?.closest("style, script, template")) continue;
+      if (p?.checkVisibility && !p.checkVisibility({ visibilityProperty: true })) continue; // hidden loading text, alternate labels
       if (prev !== undefined && prev !== p && !(inl(p) && inl(prev))) out += " ";
       out += t.data;
       prev = p;
@@ -100,6 +101,7 @@ export function locate(ref) {
     for (let t = w.nextNode(); t; t = w.nextNode()) {
       const p = t.parentElement;
       if (p?.closest("style, script, template")) continue;
+      if (p?.checkVisibility && !p.checkVisibility({ visibilityProperty: true })) continue; // hidden loading text, alternate labels
       if (prev !== undefined && prev !== p && !(inl(p) && inl(prev))) out += " ";
       out += t.data;
       prev = p;
