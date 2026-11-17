@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Kiki Browser",
   "short_name": "Kiki",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Lets Kiki on this Mac use this Chrome profile (one account per profile).",
   "minimum_chrome_version": "116",
   "homepage_url": "https://getkiki.ai",
