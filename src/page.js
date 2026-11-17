@@ -37,6 +37,14 @@ export function snapshotPage(maxText) {
     if (!el.tagName.includes("-") || !visible(el) || getComputedStyle(el).cursor !== "pointer") return false;
     return !el.querySelector(SEL) && !el.shadowRoot?.querySelector?.("input, textarea, select");
   };
+  // visible text of a shadow root: skip <style>/<script>/<template>, whose text isn't rendered
+  const shadowText = (el) => {
+    if (!el.shadowRoot) return "";
+    const w = document.createTreeWalker(el.shadowRoot, NodeFilter.SHOW_TEXT);
+    let out = "";
+    for (let t = w.nextNode(); t; t = w.nextNode()) if (!t.parentElement?.closest("style, script, template")) out += t.data + " ";
+    return out;
+  };
   const nameOf = (el) =>
     clean(el.getAttribute("aria-label")) ||
     clean(el.getAttribute("aria-labelledby") && document.getElementById(el.getAttribute("aria-labelledby"))?.innerText) ||
@@ -46,7 +54,7 @@ export function snapshotPage(maxText) {
     clean(el.getAttribute("title")) ||
     clean(el.querySelector?.("img[alt]")?.alt) ||
     clean(el.getAttribute("name")) ||
-    clean(el.shadowRoot?.textContent); // a custom element's label often lives in its shadow DOM
+    clean(shadowText(el)); // a custom element's label often lives in its shadow DOM
   const elements = [];
   let n = 0;
   // one walk in document order, so refs keep the page's reading order
@@ -75,11 +83,18 @@ export function snapshotPage(maxText) {
 
 /** Scroll the element into view and return its box in viewport CSS pixels, plus what it says. */
 export function locate(ref) {
+  const shadowText = (el) => {
+    if (!el.shadowRoot) return "";
+    const w = document.createTreeWalker(el.shadowRoot, NodeFilter.SHOW_TEXT);
+    let out = "";
+    for (let t = w.nextNode(); t; t = w.nextNode()) if (!t.parentElement?.closest("style, script, template")) out += t.data + " ";
+    return out;
+  };
   const el = globalThis.__kikiRefs?.[Number(ref)]?.deref();
   if (!el || !el.isConnected) return { error: `no element ${ref}; take a new snapshot` };
   el.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
   const r = el.getBoundingClientRect();
-  const name = (el.getAttribute("aria-label") || el.innerText || el.value || el.getAttribute("placeholder") || el.getAttribute("title") || el.shadowRoot?.textContent || "")
+  const name = (el.getAttribute("aria-label") || el.innerText || el.value || el.getAttribute("placeholder") || el.getAttribute("title") || shadowText(el) || "")
     .replace(/\s+/g, " ").trim().slice(0, 80);
   return {
     x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height,

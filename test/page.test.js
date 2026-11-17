@@ -11,7 +11,7 @@ test("injected functions are self-contained", () => {
   }
 });
 
-test("snapshot lists custom-element buttons (shadow-DOM label) in page order, skips containers and plain ones", async (t) => {
+test("snapshot lists custom-element buttons (shadow-DOM label) (style tag ignored) in page order, skips containers and plain ones", async (t) => {
   let chromium;
   try {
     ({ chromium } = await import("playwright"));
@@ -27,7 +27,7 @@ test("snapshot lists custom-element buttons (shadow-DOM label) in page order, sk
       <xhs-publish-btn style="cursor:pointer;display:inline-block;width:80px;height:30px"></xhs-publish-btn>
       <x-wrap style="cursor:pointer;display:block"><button>inner</button></x-wrap>
       <x-plain style="display:block">not clickable</x-plain>`);
-    await p.evaluate(() => (document.querySelector("xhs-publish-btn").attachShadow({ mode: "open" }).innerHTML = "<span>发布</span>"));
+    await p.evaluate(() => (document.querySelector("xhs-publish-btn").attachShadow({ mode: "open" }).innerHTML = "<style>:host{display:inline-block;padding:4px 12px;border-radius:8px;background:#ff2442;color:#fff}</style><span>发布</span>"));
     const r = await p.evaluate(`(${page.snapshotPage.toString()})(500)`);
     assert.deepEqual(r.elements.map((e) => [e.role, e.name]), [["textbox", "标题"], ["button", "上传图文"], ["button", "发布"], ["button", "inner"]]);
     const loc = await p.evaluate(`(${page.locate.toString()})(3)`);
