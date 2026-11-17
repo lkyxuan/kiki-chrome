@@ -11,7 +11,7 @@ test("injected functions are self-contained", () => {
   }
 });
 
-test("snapshot lists custom-element buttons (shadow-DOM label) (style tag ignored) in page order, skips containers and plain ones", async (t) => {
+test("snapshot lists custom-element buttons (shadow-DOM label, style ignored, inline pieces joined) in page order, skips containers and plain ones", async (t) => {
   let chromium;
   try {
     ({ chromium } = await import("playwright"));
@@ -26,10 +26,12 @@ test("snapshot lists custom-element buttons (shadow-DOM label) (style tag ignore
       <x-tab style="cursor:pointer;display:inline-block">上传图文</x-tab>
       <xhs-publish-btn style="cursor:pointer;display:inline-block;width:80px;height:30px"></xhs-publish-btn>
       <x-wrap style="cursor:pointer;display:block"><button>inner</button></x-wrap>
-      <x-plain style="display:block">not clickable</x-plain>`);
-    await p.evaluate(() => (document.querySelector("xhs-publish-btn").attachShadow({ mode: "open" }).innerHTML = "<style>:host{display:inline-block;padding:4px 12px;border-radius:8px;background:#ff2442;color:#fff}</style><span>发布</span>"));
+      <x-plain style="display:block">not clickable</x-plain>
+      <x-card style="cursor:pointer;display:inline-block"></x-card>`);
+    await p.evaluate(() => (document.querySelector("xhs-publish-btn").attachShadow({ mode: "open" }).innerHTML = "<style>:host{display:inline-block;padding:4px 12px;border-radius:8px;background:#ff2442;color:#fff}</style><span>发</span><span>布</span>"));
+    await p.evaluate(() => (document.querySelector("x-card").attachShadow({ mode: "open" }).innerHTML = "<div>Save</div><div>Draft</div>"));
     const r = await p.evaluate(`(${page.snapshotPage.toString()})(500)`);
-    assert.deepEqual(r.elements.map((e) => [e.role, e.name]), [["textbox", "标题"], ["button", "上传图文"], ["button", "发布"], ["button", "inner"]]);
+    assert.deepEqual(r.elements.map((e) => [e.role, e.name]), [["textbox", "标题"], ["button", "上传图文"], ["button", "发布"], ["button", "inner"], ["button", "Save Draft"]]);
     const loc = await p.evaluate(`(${page.locate.toString()})(3)`);
     assert.equal(loc.name, "发布", "describe sees the shadow label, so Kiki's publish check fires");
   } finally {

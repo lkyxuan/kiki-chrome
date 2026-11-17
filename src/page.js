@@ -41,8 +41,16 @@ export function snapshotPage(maxText) {
   const shadowText = (el) => {
     if (!el.shadowRoot) return "";
     const w = document.createTreeWalker(el.shadowRoot, NodeFilter.SHOW_TEXT);
-    let out = "";
-    for (let t = w.nextNode(); t; t = w.nextNode()) if (!t.parentElement?.closest("style, script, template")) out += t.data + " ";
+    // join inline pieces as-is ("发"+"布"), put a space only between block-level pieces
+    const inl = (e) => !e || getComputedStyle(e).display.startsWith("inline");
+    let out = "", prev;
+    for (let t = w.nextNode(); t; t = w.nextNode()) {
+      const p = t.parentElement;
+      if (p?.closest("style, script, template")) continue;
+      if (prev !== undefined && prev !== p && !(inl(p) && inl(prev))) out += " ";
+      out += t.data;
+      prev = p;
+    }
     return out;
   };
   const nameOf = (el) =>
@@ -86,8 +94,16 @@ export function locate(ref) {
   const shadowText = (el) => {
     if (!el.shadowRoot) return "";
     const w = document.createTreeWalker(el.shadowRoot, NodeFilter.SHOW_TEXT);
-    let out = "";
-    for (let t = w.nextNode(); t; t = w.nextNode()) if (!t.parentElement?.closest("style, script, template")) out += t.data + " ";
+    // join inline pieces as-is ("发"+"布"), put a space only between block-level pieces
+    const inl = (e) => !e || getComputedStyle(e).display.startsWith("inline");
+    let out = "", prev;
+    for (let t = w.nextNode(); t; t = w.nextNode()) {
+      const p = t.parentElement;
+      if (p?.closest("style, script, template")) continue;
+      if (prev !== undefined && prev !== p && !(inl(p) && inl(prev))) out += " ";
+      out += t.data;
+      prev = p;
+    }
     return out;
   };
   const el = globalThis.__kikiRefs?.[Number(ref)]?.deref();
