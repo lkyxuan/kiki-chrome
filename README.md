@@ -40,6 +40,8 @@ Bump `version` in both `manifest.json` and `package.json`, merge, then push a ta
 git tag v0.1.3 && git push origin v0.1.3
 ```
 
+Or open Actions → release → **Run workflow** on `main`: it tags main with the version in `manifest.json`.
+
 The `release` workflow checks the versions match, runs the tests, packs `kiki-chrome-<version>.zip` (`scripts/pack.sh`) and publishes it on Releases. To upgrade, unzip over the old folder and click reload on `chrome://extensions` in each profile.
 
 ## License

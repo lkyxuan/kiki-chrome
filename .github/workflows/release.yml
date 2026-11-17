@@ -1,8 +1,10 @@
 name: release
-# Push a tag like v0.1.2 and this packs the extension and publishes it on the Releases page.
+# Push a tag like v0.1.2, or press "Run workflow" on the Actions page (it tags main with
+# the version in manifest.json), and this packs the extension and publishes it on Releases.
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 permissions:
   contents: write
 jobs:
@@ -14,12 +16,18 @@ jobs:
         with:
           node-version: 22
       - name: Tag must match manifest.json and package.json
+        id: ver
         run: |
-          tag="${GITHUB_REF_NAME#v}"
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            tag=$(node -p "require('./manifest.json').version")
+          else
+            tag="${GITHUB_REF_NAME#v}"
+          fi
+          echo "tag=v$tag" >> "$GITHUB_OUTPUT"
           m=$(node -p "require('./manifest.json').version")
           p=$(node -p "require('./package.json').version")
           if [ "$tag" != "$m" ] || [ "$tag" != "$p" ]; then
-            echo "tag $GITHUB_REF_NAME, manifest.json $m, package.json $p: bump both before tagging" >&2
+            echo "tag v$tag, manifest.json $m, package.json $p: bump both before tagging" >&2
             exit 1
           fi
       - run: npm test
@@ -30,7 +38,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "${{ steps.pack.outputs.zip }}" \
-            --title "kiki-chrome $GITHUB_REF_NAME" \
+          tag="${{ steps.ver.outputs.tag }}"
+          gh release create "$tag" "${{ steps.pack.outputs.zip }}" \
+            --target "$GITHUB_SHA" \
+            --title "kiki-chrome $tag" \
             --generate-notes \
-            --notes "下载 kiki-chrome-${GITHUB_REF_NAME#v}.zip，解压后在每个 Chrome Profile 的 chrome://extensions 里「加载已解压的扩展程序」选这个文件夹；升级就解压到原来的文件夹覆盖，再点刷新。"
+            --notes "下载 kiki-chrome-${tag#v}.zip，解压后在每个 Chrome Profile 的 chrome://extensions 里「加载已解压的扩展程序」选这个文件夹；升级就解压到原来的文件夹覆盖，再点刷新。"
