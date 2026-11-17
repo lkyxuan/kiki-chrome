@@ -92,5 +92,52 @@ addEventListener("click",e=>{seen.trusted&&=e.isTrusted},true);</script>`;
   const sawErr = await pop2.waitForFunction(() => document.getElementById("status").textContent.includes("配对码不对") && document.getElementById("save").textContent === "重新连接", null, { timeout: 5000 }).then(() => true, () => false);
   console.log("popup bad code:", sawErr ? "OK" : "FAIL", "|", await pop2.textContent("#status"));
   if (!sawErr) process.exitCode = 1;
-  await ctx.close(); wss.close(); web.close(); process.exit(process.exitCode || 0);
+  await ctx.close();
+
+  // approve in Kiki: a fresh install with no name and no code asks, waits, then keeps the key Kiki gives it
+  const wss2 = new WebSocketServer({ port: 8713, path: "/ext" });
+  const hellos = [];
+  let last;
+  wss2.on("connection", (s) => s.on("message", (d) => {
+    const m = JSON.parse(d);
+    if (m.type !== "hello") return;
+    hellos.push(m); last = s;
+    if (m.key === "K1") s.send(JSON.stringify({ type: "welcome", name: m.name }));
+    else s.send(JSON.stringify({ type: "pending", name: "浏览器7" }));
+  }));
+  const until = async (f, ms = 8000) => { const t = Date.now(); while (!(await f())) { if (Date.now() - t > ms) return false; await new Promise((r) => setTimeout(r, 100)); } return true; };
+  const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), "kc-"));
+  const ctx2 = await chromium.launchPersistentContext(dir2, { headless: true, channel: "chromium", args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`] });
+  let [sw2] = ctx2.serviceWorkers(); if (!sw2) sw2 = await ctx2.waitForEvent("serviceworker");
+  await sw2.evaluate(() => chrome.storage.local.set({ server: "ws://127.0.0.1:8713/ext" }));
+  const asked = await until(() => hellos.length >= 1);
+  const h1 = hellos[0] || {};
+  const askOk = asked && !h1.token && !h1.key && /^[A-Za-z0-9_-]{8,64}$/.test(h1.install || "");
+  console.log("asks without code:", JSON.stringify(h1), askOk ? "OK" : "FAIL");
+  const waiting = await until(async () => (await sw2.evaluate(() => chrome.storage.session.get("status"))).status?.state === "waiting");
+  const pop3 = await ctx2.newPage();
+  await pop3.goto(`chrome-extension://${sw2.url().split("/")[2]}/popup.html`);
+  const popWait = await until(async () => (await pop3.textContent("#status")).includes("同意「浏览器7」"));
+  console.log("waiting for approval:", waiting && popWait ? "OK" : "FAIL", "|", await pop3.textContent("#status"));
+  last.send(JSON.stringify({ type: "welcome", name: "浏览器7", key: "K1" }));
+  const kept = await until(async () => (await sw2.evaluate(() => chrome.storage.local.get(["key", "name"]))).key === "K1");
+  const popOk = await until(async () => (await pop3.textContent("#status")).includes("这个浏览器叫「浏览器7」"));
+  last.close(1001, "Kiki restarting"); // Kiki restarts: the extension comes back on its own, with the key
+  const rekeyed = await until(() => hellos.some((m) => m.key === "K1" && m.name === "浏览器7" && m.install === h1.install));
+  const approveOk = kept && popOk && rekeyed;
+  console.log("approved, key kept, reconnects with key:", approveOk ? "OK" : "FAIL", JSON.stringify({ kept, popOk, rekeyed, hellos: hellos.length }));
+  // refused in Kiki: stops asking until 连接 is clicked
+  await sw2.evaluate(() => chrome.storage.local.remove("key"));
+  last.close(1001, "Kiki restarting");
+  await until(() => hellos.length >= 3 && !hellos.at(-1).key);
+  last.close(4005, "refused in Kiki");
+  const refused = await until(async () => (await sw2.evaluate(() => chrome.storage.local.get("refused"))).refused === true);
+  const n = hellos.length;
+  await sw2.evaluate(() => chrome.storage.local.set({ server: "ws://127.0.0.1:8713/ext?again" })); // forces a reconnect attempt
+  await new Promise((r) => setTimeout(r, 1500));
+  const quiet = hellos.length === n;
+  console.log("refused stays quiet:", refused && quiet ? "OK" : "FAIL");
+  if (!askOk || !waiting || !popWait || !approveOk || !refused || !quiet) process.exitCode = 1;
+  await ctx2.close(); wss2.close();
+  wss.close(); web.close(); process.exit(process.exitCode || 0);
 })().catch((e) => { console.error("FAIL", e); process.exit(1); });

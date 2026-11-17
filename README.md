@@ -8,14 +8,14 @@ Install it in every Chrome profile you want Kiki to use. Each copy connects to K
 
 1. Download `kiki-chrome-<version>.zip` from [Releases](https://github.com/lkyxuan/kiki-chrome/releases/latest) and unzip it somewhere it can stay (Chrome loads it from there).
 2. In each Chrome profile: open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, pick the unzipped folder.
-3. Click the Kiki icon in the toolbar, fill in:
-   - **Name**: what Kiki calls this browser, e.g. `浏览器1`. Different in every profile.
-   - **Pairing code**: copy it from Kiki → Settings → Browsers.
-4. The icon shows no badge when connected, `…` while connecting and `!` when it cannot reach Kiki.
+3. That's it: the extension finds Kiki on its own. In Kiki → Settings → Browsers a row "新浏览器想连上" appears; give it a name and click 同意. Kiki hands this browser its own key, so it reconnects by itself from then on.
+   - Kiki on another computer (over Tailscale): click the Kiki icon → 高级, paste the address shown in Kiki's Settings → Browsers ("别的电脑填"), then approve in Kiki.
+   - Fallback on the same Mac: paste the pairing code from Kiki → Settings → Browsers into 高级 → 配对码.
+4. The icon shows no badge when connected, `…` while connecting or waiting for approval and `!` when it cannot reach Kiki.
 
 ## How it works
 
-- The service worker keeps one WebSocket to Kiki (`ws://127.0.0.1:4567/ext` by default), sends `hello` with the browser name and pairing code, and pings every 20 s (Chrome 116+ keeps a worker alive while WebSocket traffic flows). If Kiki is not running it retries with backoff; an alarm every 30 s is the backstop.
+- The service worker keeps one WebSocket to Kiki (`ws://127.0.0.1:4567/ext` by default), sends `hello` (its key, or the pairing code, or just a random install id when it is new and waits for approval), and pings every 20 s (Chrome 116+ keeps a worker alive while WebSocket traffic flows). If Kiki is not running it retries with backoff; an alarm every 30 s is the backstop.
 - Kiki sends `{type:"call", id, action, params}`; the extension answers `{type:"result", id, ok, result|error}`.
 - Actions: `tabs`, `open`, `navigate`, `close`, `snapshot`, `describe`, `click`, `type`, `key`, `scroll`, `upload`, `screenshot`, `eval`. See `src/protocol.js`.
 - **Only tabs it opened.** Every tab Kiki opens goes into an orange **Kiki** tab group. Actions on any other tab are refused, so your own tabs in that profile are never touched.
