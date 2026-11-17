@@ -20,7 +20,8 @@ Install it in every Chrome profile you want Kiki to use. Each copy connects to K
 - Actions: `tabs`, `open`, `navigate`, `close`, `snapshot`, `describe`, `click`, `type`, `key`, `scroll`, `upload`, `screenshot`, `eval`. See `src/protocol.js`.
 - **Only tabs it opened.** Every tab Kiki opens goes into an orange **Kiki** tab group. Actions on any other tab are refused, so your own tabs in that profile are never touched.
 - Clicks, typing and file uploads go through `chrome.debugger` (real input events, works on sites that ignore synthetic events). While it is attached Chrome shows "Kiki started debugging this browser"; it detaches after 30 s without actions.
-- `snapshot` lists clickable / typeable elements with a number (`ref`) and the page text; later actions use the `ref`.
+- Input behaves like a person, never like a script: the mouse glides along a curved path to a slightly random spot inside the element, presses and releases with a short hold; text is typed key by key with uneven pauses (Chinese and other non-ASCII text is committed a few characters at a time, like an input method; newlines are inserted, never pressed as Enter). Page-side JavaScript sees only trusted events (`isTrusted: true`). Long text speeds up so one `type` finishes inside Kiki's 60 s call timeout.
+- `snapshot` lists clickable / typeable elements with a number (`ref`) and the page text; later actions use the `ref`. The numbers live in the extension's isolated world, so nothing is written into the page (an upload adds a random attribute only for the instant the debugger needs it).
 - Kiki, not the extension, decides whether a click or an Enter needs your approval (posting, sending, replying). It calls `describe` first to see what the button says.
 
 ## Develop

@@ -1,7 +1,7 @@
 // Service worker: keeps one WebSocket to Kiki on this Mac and runs the actions Kiki sends,
 // only inside tabs this extension opened (the "Kiki" tab group).
-import { ACTIONS, DEBUGGER_IDLE_MS, DEFAULT_SERVER, GROUP_TITLE, HEARTBEAT_MS, backoff, fail, hello, keyEvent, ok, parseCall, validName } from "./protocol.js";
-import { locate, snapshotPage } from "./page.js";
+import { ACTIONS, DEBUGGER_IDLE_MS, DEFAULT_SERVER, GROUP_TITLE, HEARTBEAT_MS, backoff, charKeyEvent, clickPoint, fail, hello, keyEvent, mousePath, ok, parseCall, typingPlan, validName } from "./protocol.js";
+import { locate, markRef, snapshotPage, unmarkRef } from "./page.js";
 
 const VERSION = chrome.runtime.getManifest().version;
 let ws = null;
@@ -215,13 +215,46 @@ async function point(tabId, ref) {
   return p;
 }
 
-async function mouseClick(tabId, x, y) {
-  await cdp(tabId, "Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
-  await cdp(tabId, "Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", clickCount: 1 });
-  await cdp(tabId, "Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", clickCount: 1 });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const between = (lo, hi) => lo + Math.round(Math.random() * (hi - lo));
+
+// Where the mouse was left in each tab, so the next move starts from there instead of jumping.
+const mouseAt = new Map(); // tabId -> { x, y }
+
+/** Glide the mouse to `to` along a curved path, like a hand would. */
+async function moveMouse(tabId, to, view) {
+  const from = mouseAt.get(tabId) || { x: between(0, view?.vw || 800), y: between(0, view?.vh || 600) };
+  for (const pt of mousePath(from, to)) {
+    if (pt.wait) await sleep(pt.wait);
+    await cdp(tabId, "Input.dispatchMouseEvent", { type: "mouseMoved", x: pt.x, y: pt.y });
+  }
+  mouseAt.set(tabId, { x: to.x, y: to.y });
 }
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/** Move to a slightly random spot inside the element, pause, press, hold briefly, release. */
+async function mouseClick(tabId, box) {
+  const { x, y } = clickPoint(box);
+  await moveMouse(tabId, { x, y }, box);
+  await sleep(between(40, 120));
+  await cdp(tabId, "Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", buttons: 1, clickCount: 1 });
+  await sleep(between(50, 130));
+  await cdp(tabId, "Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", buttons: 0, clickCount: 1 });
+}
+
+/** Type key by key with human pauses (see typingPlan); non-ASCII is committed in small runs like an IME. */
+async function typeText(tabId, text) {
+  for (const step of typingPlan(text)) {
+    if (step.wait) await sleep(step.wait);
+    if (step.kind === "insert") {
+      await cdp(tabId, "Input.insertText", { text: step.text });
+      continue;
+    }
+    const ev = charKeyEvent(step.ch);
+    await cdp(tabId, "Input.dispatchKeyEvent", { type: "keyDown", ...ev });
+    await sleep(between(15, 45)); // key held down briefly (counted in typingPlan's budget)
+    await cdp(tabId, "Input.dispatchKeyEvent", { type: "keyUp", ...ev, text: undefined, unmodifiedText: undefined });
+  }
+}
 
 // ---------- actions ----------
 
@@ -249,6 +282,7 @@ async function run(action, p) {
       return { url: t.url, title: t.title };
     }
     case "close":
+      mouseAt.delete(p.tabId);
       detach(p.tabId);
       await chrome.tabs.remove(p.tabId);
       return { closed: p.tabId };
@@ -259,14 +293,14 @@ async function run(action, p) {
       return { ref: p.ref, name, tag, type };
     }
     case "click": {
-      const { x, y, name } = await point(p.tabId, p.ref);
-      await mouseClick(p.tabId, x, y);
-      return { clicked: p.ref, name };
+      const box = await point(p.tabId, p.ref);
+      await mouseClick(p.tabId, box);
+      return { clicked: p.ref, name: box.name };
     }
     case "type": {
       if (p.ref !== undefined) {
-        const { x, y } = await point(p.tabId, p.ref);
-        await mouseClick(p.tabId, x, y);
+        await mouseClick(p.tabId, await point(p.tabId, p.ref));
+        await sleep(between(150, 400));
       }
       if (p.clear) {
         await cdp(p.tabId, "Input.dispatchKeyEvent", { type: "keyDown", ...keyEvent("cmd+a") });
@@ -274,7 +308,7 @@ async function run(action, p) {
         await cdp(p.tabId, "Input.dispatchKeyEvent", { type: "keyDown", ...keyEvent("Backspace") });
         await cdp(p.tabId, "Input.dispatchKeyEvent", { type: "keyUp", ...keyEvent("Backspace") });
       }
-      await cdp(p.tabId, "Input.insertText", { text: String(p.text) });
+      await typeText(p.tabId, String(p.text));
       return { typed: String(p.text).length };
     }
     case "key": {
@@ -284,18 +318,26 @@ async function run(action, p) {
       return { pressed: p.key };
     }
     case "scroll": {
-      let x = 400;
-      let y = 300;
-      if (p.ref !== undefined) ({ x, y } = await point(p.tabId, p.ref));
+      let to = mouseAt.get(p.tabId) || { x: between(300, 500), y: between(250, 350) };
+      if (p.ref !== undefined) to = clickPoint(await point(p.tabId, p.ref));
+      await moveMouse(p.tabId, to);
+      const { x, y } = to;
       const dy = Number(p.deltaY ?? (p.direction === "up" ? -600 : 600));
       await cdp(p.tabId, "Input.dispatchMouseEvent", { type: "mouseWheel", x, y, deltaX: 0, deltaY: dy });
       return { scrolled: dy };
     }
     case "upload": {
-      const sel = `[data-kiki-ref="${String(p.ref).replace(/"/g, "")}"]`;
-      const { result } = await cdp(p.tabId, "Runtime.evaluate", { expression: `document.querySelector(${JSON.stringify(sel)})` });
-      if (!result?.objectId) throw new Error(`no element ${p.ref}; take a new snapshot`);
-      await cdp(p.tabId, "DOM.setFileInputFiles", { objectId: result.objectId, files: p.files });
+      // the element gets a random one-off attribute only for the moment the debugger needs to find it
+      const attr = `data-k${crypto.randomUUID().slice(0, 8)}`;
+      const marked = await inPage(p.tabId, markRef, p.ref, attr);
+      if (!marked || marked.error) throw new Error(marked?.error || `no element ${p.ref}; take a new snapshot`);
+      try {
+        const { result } = await cdp(p.tabId, "Runtime.evaluate", { expression: `document.querySelector(${JSON.stringify(`[${attr}]`)})` });
+        if (!result?.objectId) throw new Error(`no element ${p.ref}; take a new snapshot`);
+        await cdp(p.tabId, "DOM.setFileInputFiles", { objectId: result.objectId, files: p.files });
+      } finally {
+        await inPage(p.tabId, unmarkRef, attr).catch(() => {});
+      }
       return { uploaded: p.files.length };
     }
     case "screenshot": {

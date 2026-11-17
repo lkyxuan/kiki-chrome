@@ -1,6 +1,6 @@
 {
   "name": "kiki-chrome",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "description": "Chrome extension that lets Kiki drive your browser profiles, one account per profile.",
