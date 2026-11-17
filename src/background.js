@@ -1,6 +1,6 @@
 // Service worker: keeps one WebSocket to Kiki on this Mac and runs the actions Kiki sends,
 // only inside tabs this extension opened (the "Kiki" tab group).
-import { ACTIONS, DEBUGGER_IDLE_MS, DEFAULT_SERVER, GROUP_TITLE, HEARTBEAT_MS, backoff, charKeyEvent, clickPoint, fail, hello, keyEvent, mousePath, ok, parseCall, typingPlan, validName } from "./protocol.js";
+import { ACTIONS, DEBUGGER_IDLE_MS, DEFAULT_SERVER, GROUP_TITLE, HEARTBEAT_MS, backoff, charKeyEvent, clickPoint, fail, hello, keyEvent, mousePath, ok, newInstallId, parseCall, typingPlan, validName } from "./protocol.js";
 import { locate, markRef, snapshotPage, unmarkRef } from "./page.js";
 
 const VERSION = chrome.runtime.getManifest().version;
@@ -12,13 +12,17 @@ let beat = null;
 // ---------- settings & status ----------
 
 async function settings() {
-  const s = await chrome.storage.local.get(["name", "token", "server"]);
-  return { name: s.name || "", token: s.token || "", server: s.server || DEFAULT_SERVER };
+  const s = await chrome.storage.local.get(["name", "token", "server", "key", "install", "refused"]);
+  if (!s.install) {
+    s.install = newInstallId();
+    await chrome.storage.local.set({ install: s.install });
+  }
+  return { name: s.name || "", token: s.token || "", server: s.server || DEFAULT_SERVER, key: s.key || "", install: s.install, refused: s.refused || 0 };
 }
 
 async function setStatus(state, detail = "") {
   await chrome.storage.session.set({ status: { state, detail, at: Date.now() } });
-  const badge = { connected: "", connecting: "…", error: "!", off: "" }[state] ?? "";
+  const badge = { connected: "", connecting: "…", waiting: "…", error: "!", off: "" }[state] ?? "";
   chrome.action.setBadgeText({ text: badge });
   chrome.action.setBadgeBackgroundColor({ color: state === "error" ? "#d93025" : "#fd890c" });
 }
@@ -28,9 +32,14 @@ async function setStatus(state, detail = "") {
 const CLOSE_REASONS = {
   4001: "配对码不对，到 Kiki 设置 → 浏览器 里重新复制",
   4002: "名字不行：只用文字、数字、- 和 _",
-  4003: "在 Kiki 里被删掉了，点连接重新加上",
+  4003: "在 Kiki 里被删掉了，点「连接」重新申请",
   4004: "另一个 Profile 也叫这个名字，换一个名字",
+  4005: "在 Kiki 里被拒绝了；要连就点「连接」重新申请",
+  4006: "Kiki 那边等同意的浏览器太多了，先去 Kiki 设置 → 浏览器 处理一下",
+  4007: "配对码只能在 Kiki 那台电脑上用；别的电脑请清空配对码，点「连接」后去 Kiki 里点同意",
 };
+// No pairing code and Kiki still said 4001: that Kiki predates approve-in-Kiki
+const OLD_KIKI = "这个 Kiki 版本还不能点同意：先更新 Kiki，或在「高级」里填配对码";
 
 // Only one connection attempt at a time: settings are read asynchronously, so two callers
 // (popup save fires both the storage listener and the reconnect message) could otherwise both open a socket.
@@ -44,8 +53,14 @@ async function doConnect() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
   clearTimeout(retryTimer);
   const s = await settings();
-  if (!validName(s.name) || !s.token) {
-    await setStatus("off", "填上名字和配对码");
+  if (s.name && !validName(s.name)) {
+    await setStatus("off", "名字只用文字、数字、- 和 _");
+    return;
+  }
+  // Refused (4005) or removed (4003) in Kiki: don't ask again on every Chrome start or keepalive alarm;
+  // clicking 连接 in the popup clears this
+  if (s.refused && !s.token && !s.key) {
+    await setStatus("off", CLOSE_REASONS[s.refused] || CLOSE_REASONS[4005]);
     return;
   }
   await setStatus("connecting");
@@ -58,7 +73,7 @@ async function doConnect() {
   }
   ws = sock;
   sock.onopen = () => {
-    sock.send(JSON.stringify(hello({ token: s.token, name: s.name, version: VERSION })));
+    sock.send(JSON.stringify(hello({ token: s.token, name: s.name, version: VERSION, key: s.key, install: s.install })));
     clearInterval(beat);
     beat = setInterval(() => sock.readyState === WebSocket.OPEN && sock.send('{"type":"ping"}'), HEARTBEAT_MS);
   };
@@ -68,6 +83,9 @@ async function doConnect() {
     if (ws === sock) ws = null;
     // Codes Kiki sends when retrying will not help until the user changes something.
     // 4004 must not retry either: two Profiles with the same name would keep kicking each other off.
+    if (ev.code === 4005) chrome.storage.local.set({ refused: 4005 });
+    if (ev.code === 4003) chrome.storage.local.set({ refused: 4003, key: "" });
+    if (ev.code === 4001 && !s.token) return setStatus("error", OLD_KIKI);
     const fatal = CLOSE_REASONS[ev.code];
     if (fatal) return setStatus("error", fatal);
     setStatus("error", "连不上 Kiki：确认 Kiki 开着，地址没填错");
@@ -110,7 +128,14 @@ async function onMessage(sock, data) {
   }
   if (msg.type === "welcome") {
     attempt = 0;
+    // Approved in Kiki: keep the key and the name Kiki settled on, so the next start connects straight away
+    // (the storage listener ignores name/key, so this does not trigger a reconnect)
+    if (msg.key) await chrome.storage.local.set({ key: msg.key, name: msg.name || "", refused: 0 });
     return setStatus("connected", msg.name || "");
+  }
+  if (msg.type === "pending") {
+    attempt = 0;
+    return setStatus("waiting", msg.name || "");
   }
   if (msg.type === "pong") return;
   if (msg.type !== "call") return;
@@ -360,7 +385,8 @@ async function run(action, p) {
 chrome.runtime.onStartup.addListener(() => connect());
 chrome.runtime.onInstalled.addListener(() => connect());
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && (changes.name || changes.token || changes.server)) reconnect();
+  // name changes come from the popup (which also sends "reconnect") or from Kiki's welcome: neither needs this
+  if (area === "local" && (changes.token || changes.server)) reconnect();
 });
 // backstop: if the worker was stopped, the alarm wakes it and we reconnect
 chrome.alarms.create("kiki-keepalive", { periodInMinutes: 0.5 });

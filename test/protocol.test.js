@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ACTIONS, backoff, keyEvent, looksLikePublish, parseCall, validName } from "../src/protocol.js";
+import { ACTIONS, backoff, hello, keyEvent, looksLikePublish, newInstallId, parseCall, validName } from "../src/protocol.js";
 
 test("browser names: letters in any script, digits, - and _", () => {
   assert.ok(validName("推特-品牌号"));
@@ -9,6 +9,8 @@ test("browser names: letters in any script, digits, - and _", () => {
   assert.ok(!validName("has space"));
   assert.ok(!validName("a/b"));
   assert.ok(!validName("x".repeat(41)));
+  assert.ok(!validName("constructor"));
+  assert.ok(!validName("__proto__"));
 });
 
 test("parseCall accepts a good call", () => {
@@ -105,4 +107,18 @@ test("click point on an element taller than the window stays on screen", () => {
     assert.ok(p.y >= 0 && p.y <= 600, String(p.y));
     assert.ok(Math.abs(p.y - 300) <= 120);
   }
+});
+
+test("hello: sends only what is set, so Kiki can tell approve / key / pairing code apart", () => {
+  const ask = JSON.parse(JSON.stringify(hello({ token: "", name: "", version: "0.1.3", key: "", install: "abcdefgh12" })));
+  assert.deepEqual(ask, { type: "hello", protocol: 2, version: "0.1.3", install: "abcdefgh12" });
+  const keyed = JSON.parse(JSON.stringify(hello({ name: "浏览器1", version: "0.1.3", key: "k", install: "abcdefgh12" })));
+  assert.equal(keyed.key, "k");
+  assert.equal(keyed.token, undefined);
+});
+
+test("install ids are random and fit what Kiki accepts", () => {
+  const a = newInstallId();
+  assert.match(a, /^[A-Za-z0-9_-]{8,64}$/);
+  assert.notEqual(a, newInstallId());
 });

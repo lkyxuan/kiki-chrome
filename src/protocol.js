@@ -1,6 +1,6 @@
 // Pure helpers shared by the service worker and the tests. No chrome.* here.
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 export const DEFAULT_SERVER = "ws://127.0.0.1:4567/ext";
 export const HEARTBEAT_MS = 20_000; // Chrome 116+: WebSocket traffic keeps the service worker alive
 export const DEBUGGER_IDLE_MS = 30_000; // detach (and drop the "is debugging" bar) after this long without actions
@@ -24,7 +24,7 @@ export const ACTIONS = {
 };
 
 /** Browser names look like "mac-mini-1" or "工作浏览器": letters (any script), digits, - and _. */
-export const validName = (s) => typeof s === "string" && /^[\p{L}\p{N}_-]{1,40}$/u.test(s);
+export const validName = (s) => typeof s === "string" && /^[\p{L}\p{N}_-]{1,40}$/u.test(s) && !(s in Object.prototype); // same as Kiki: no "constructor", "__proto__"…
 
 /** Parse one message from Kiki. Returns { id, action, params } or throws with a reason Kiki can show. */
 export function parseCall(raw) {
@@ -50,7 +50,21 @@ export function parseCall(raw) {
   return { id: m.id, action: m.action, params };
 }
 
-export const hello = ({ token, name, version }) => ({ type: "hello", protocol: PROTOCOL_VERSION, token, name, version });
+/**
+ * First message on every connection. Kiki accepts one of:
+ * - `key` + `name`: the per-browser key Kiki gave when you approved it; connects straight away.
+ * - `token` + `name`: the pairing code from Kiki → Settings → Browsers (same Mac only).
+ * - neither: Kiki answers `pending` and lists this browser under "新浏览器想连上" until you approve it,
+ *   then sends `welcome` with a `key`. `install` tells repeat requests from the same install apart.
+ */
+export const hello = ({ token, name, version, key, install }) => ({ type: "hello", protocol: PROTOCOL_VERSION, token: token || undefined, name: name || undefined, version, key: key || undefined, install });
+
+/** Random id for this install, sent while waiting for approval. */
+export const newInstallId = () => {
+  const b = new Uint8Array(16);
+  crypto.getRandomValues(b);
+  return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+};
 export const ok = (id, result) => ({ type: "result", id, ok: true, result });
 export const fail = (id, err) => ({ type: "result", id, ok: false, error: String(err?.message || err) });
 

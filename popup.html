@@ -29,16 +29,18 @@
   <div class="status"><span class="dot" id="dot"></span><span id="status">未连接</span></div>
 
   <label for="name">这个浏览器叫什么</label>
-  <input id="name" placeholder="例如 浏览器1" maxlength="40">
-  <div class="hint">只用文字、数字、- 和 _。每个 Profile 填不一样的。</div>
+  <input id="name" placeholder="不填的话 Kiki 会起名" maxlength="40">
+  <div class="hint">只用文字、数字、- 和 _。在 Kiki 里点同意时也能改。</div>
+  <div class="hint">装好会自己去找 Kiki，到 Kiki → 设置 → 浏览器 点同意就连上了。</div>
 
-  <label for="token">配对码</label>
-  <input id="token" placeholder="在 Kiki 设置 → 浏览器 里复制" autocomplete="off">
-
-  <details>
+  <details id="adv">
     <summary>高级</summary>
     <label for="server">Kiki 地址</label>
     <input id="server" placeholder="ws://127.0.0.1:4567/ext">
+    <div class="hint">别的电脑上的 Kiki：填 Kiki 设置 → 浏览器 里「别的电脑填」那个地址。</div>
+    <label for="token">配对码（备用）</label>
+    <input id="token" placeholder="在 Kiki 设置 → 浏览器 里复制" autocomplete="off">
+    <div class="hint">点同意不方便时用，只在 Kiki 那台电脑上有效。</div>
   </details>
 
   <button id="save">连接</button>
