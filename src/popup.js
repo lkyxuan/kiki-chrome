@@ -1,7 +1,12 @@
 import { DEFAULT_SERVER, validName } from "./protocol.js";
 
 const $ = (id) => document.getElementById(id);
-const LABEL = { connected: "已连上 Kiki", connecting: "正在连接…", waiting: "等你在 Kiki 里点同意", error: "没连上", off: "没连接" };
+// Texts follow Chrome's language (English by default): _locales/*/messages.json
+const t = (key, sub) => chrome.i18n.getMessage(key, sub);
+for (const el of document.querySelectorAll("[data-i18n]")) el.textContent = t(el.dataset.i18n);
+for (const el of document.querySelectorAll("[data-i18n-placeholder]")) el.placeholder = t(el.dataset.i18nPlaceholder);
+document.documentElement.lang = chrome.i18n.getUILanguage();
+const LABEL = { connected: t("stConnected"), connecting: t("stConnecting"), waiting: t("stWaiting"), error: t("stError"), off: t("stOff") };
 const WAIT_MS = 10_000; // this long without "connected" after a click: say so instead of spinning forever
 
 let nameEdited = false; // the user typed in the name box: don't overwrite it with the name Kiki settled on
@@ -28,43 +33,43 @@ function show(st) {
   const state = st?.state || "off";
   $("dot").className = `dot ${state}`;
   const detail =
-    state === "connected" ? (st?.detail ? `，这个浏览器叫「${st.detail}」` : "")
-    : state === "waiting" ? `：到 Kiki → 设置 → 浏览器，同意「${st?.detail || "新浏览器"}」`
-    : st?.detail ? `：${st.detail}` : "";
+    state === "connected" ? (st?.detail ? t("stNamed", st.detail) : "")
+    : state === "waiting" ? t("stWaitingDetail", st?.detail || t("newBrowser"))
+    : st?.detail ? t("detailSep") + st.detail : "";
   $("status").textContent = LABEL[state] + detail;
   $("status").className = state === "error" ? "err" : "";
 
   if (!clickedAt) {
-    button(state === "connected" ? "重新连接" : state === "waiting" ? "重新申请" : "连接");
+    button(state === "connected" ? t("btnReconnect") : state === "waiting" ? t("btnReapply") : t("btnConnect"));
     return;
   }
   // waiting for the answer to this click
   if ((st?.at || 0) < clickedAt) return;
   if (state === "waiting") {
     clearTimeout(waitTimer); // Kiki answered; now it is up to you, no time limit
-    button("等你同意…", true);
+    button(t("btnWaiting"), true);
   } else if (state === "connected") {
     clearTimeout(waitTimer);
-    button("连上了 ✓", true);
+    button(t("btnConnected"), true);
     setTimeout(() => window.close(), 1200);
   } else if (state === "error" || state === "off") {
     clearTimeout(waitTimer);
     clickedAt = 0;
-    button("重新连接");
+    button(t("btnReconnect"));
   }
 }
 
 $("save").onclick = async () => {
   const name = $("name").value.trim();
   const token = $("token").value.trim();
-  if (name && !validName(name)) return say("名字只用文字、数字、- 和 _，最多 40 个字");
+  if (name && !validName(name)) return say(t("badName"));
   clickedAt = Date.now();
-  button("连接中…", true);
+  button(t("btnConnecting"), true);
   clearTimeout(waitTimer);
   waitTimer = setTimeout(() => {
     clickedAt = 0;
-    button("重新连接");
-    say("10 秒还没连上：确认这台电脑上 Kiki 开着、已经更新到最新版");
+    button(t("btnReconnect"));
+    say(t("slow"));
   }, WAIT_MS);
   // clicking 连接 also takes back an earlier 拒绝 / 删除 in Kiki, so the browser asks again
   await chrome.storage.local.set({ name, token, server: $("server").value.trim() || DEFAULT_SERVER, refused: 0 });

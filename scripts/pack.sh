@@ -6,5 +6,5 @@ version=$(node -p "require('./manifest.json').version")
 mkdir -p dist
 out="dist/kiki-chrome-${version}.zip"
 rm -f "$out"
-zip -qr "$out" manifest.json popup.html icons src LICENSE
+zip -qr "$out" manifest.json popup.html icons src _locales LICENSE
 echo "$out"

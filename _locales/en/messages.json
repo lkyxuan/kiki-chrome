@@ -1,0 +1,130 @@
+{
+  "extName": {
+    "message": "Kiki Browser"
+  },
+  "extDesc": {
+    "message": "Lets Kiki on this Mac use this Chrome profile (one account per profile)."
+  },
+  "stConnected": {
+    "message": "Connected to Kiki"
+  },
+  "stConnecting": {
+    "message": "Connecting…"
+  },
+  "stWaiting": {
+    "message": "Waiting for you to allow it in Kiki"
+  },
+  "stError": {
+    "message": "Not connected"
+  },
+  "stOff": {
+    "message": "Not connected"
+  },
+  "stNamed": {
+    "message": ", this browser is called “$VALUE$”",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "stWaitingDetail": {
+    "message": ": in Kiki → Settings → Browsers, allow “$VALUE$”",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "newBrowser": {
+    "message": "new browser"
+  },
+  "btnConnect": {
+    "message": "Connect"
+  },
+  "btnReconnect": {
+    "message": "Reconnect"
+  },
+  "btnReapply": {
+    "message": "Ask again"
+  },
+  "btnWaiting": {
+    "message": "Waiting for you to allow…"
+  },
+  "btnConnected": {
+    "message": "Connected ✓"
+  },
+  "btnConnecting": {
+    "message": "Connecting…"
+  },
+  "badName": {
+    "message": "Names can only use letters, digits, - and _, up to 40 characters"
+  },
+  "slow": {
+    "message": "Still not connected after 10 seconds: make sure Kiki is running on this computer and up to date"
+  },
+  "lblName": {
+    "message": "Name this browser"
+  },
+  "phName": {
+    "message": "Leave empty and Kiki picks a name"
+  },
+  "hintName": {
+    "message": "Letters, digits, - and _ only. You can also change it when you allow it in Kiki."
+  },
+  "hintAuto": {
+    "message": "Once installed it finds Kiki by itself: allow it in Kiki → Settings → Browsers and you're connected."
+  },
+  "advanced": {
+    "message": "Advanced"
+  },
+  "lblServer": {
+    "message": "Kiki address"
+  },
+  "hintServer": {
+    "message": "Kiki on another computer: enter the “Other computers use” address from Kiki → Settings → Browsers."
+  },
+  "lblToken": {
+    "message": "Pairing code (backup)"
+  },
+  "phToken": {
+    "message": "Copy it from Kiki → Settings → Browsers"
+  },
+  "hintToken": {
+    "message": "Use it when clicking Allow is inconvenient. Only works on the computer running Kiki."
+  },
+  "close4001": {
+    "message": "Wrong pairing code: copy it again from Kiki → Settings → Browsers"
+  },
+  "close4002": {
+    "message": "That name won't work: use only letters, digits, - and _"
+  },
+  "close4003": {
+    "message": "Removed in Kiki. Click Connect to ask again"
+  },
+  "close4004": {
+    "message": "Another profile already uses this name. Pick a different one"
+  },
+  "close4005": {
+    "message": "Declined in Kiki. To connect, click Connect to ask again"
+  },
+  "close4006": {
+    "message": "Too many browsers are waiting in Kiki. Deal with them in Kiki → Settings → Browsers first"
+  },
+  "close4007": {
+    "message": "The pairing code only works on the computer running Kiki. On other computers clear it, click Connect, then allow it in Kiki"
+  },
+  "oldKiki": {
+    "message": "This Kiki version can't approve browsers yet: update Kiki, or enter the pairing code under Advanced"
+  },
+  "badServer": {
+    "message": "Wrong Kiki address. It should look like ws://127.0.0.1:4567/ext"
+  },
+  "cantReach": {
+    "message": "Can't reach Kiki: make sure Kiki is running and the address is right"
+  },
+  "detailSep": {
+    "message": ": ",
+    "description": "Between a status and its reason"
+  }
+}
