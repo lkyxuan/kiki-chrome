@@ -29,17 +29,11 @@ async function setStatus(state, detail = "") {
 
 // ---------- connection ----------
 
-const CLOSE_REASONS = {
-  4001: "配对码不对，到 Kiki 设置 → 浏览器 里重新复制",
-  4002: "名字不行：只用文字、数字、- 和 _",
-  4003: "在 Kiki 里被删掉了，点「连接」重新申请",
-  4004: "另一个 Profile 也叫这个名字，换一个名字",
-  4005: "在 Kiki 里被拒绝了；要连就点「连接」重新申请",
-  4006: "Kiki 那边等同意的浏览器太多了，先去 Kiki 设置 → 浏览器 处理一下",
-  4007: "配对码只能在 Kiki 那台电脑上用；别的电脑请清空配对码，点「连接」后去 Kiki 里点同意",
-};
+// Texts follow Chrome's language (English by default, Chinese when Chrome is in Chinese): _locales/*/messages.json
+const t = (key) => chrome.i18n.getMessage(key);
+const CLOSE_REASONS = Object.fromEntries([4001, 4002, 4003, 4004, 4005, 4006, 4007].map((c) => [c, t(`close${c}`)]));
 // No pairing code and Kiki still said 4001: that Kiki predates approve-in-Kiki
-const OLD_KIKI = "这个 Kiki 版本还不能点同意：先更新 Kiki，或在「高级」里填配对码";
+const OLD_KIKI = t("oldKiki");
 
 // Only one connection attempt at a time: settings are read asynchronously, so two callers
 // (popup save fires both the storage listener and the reconnect message) could otherwise both open a socket.
@@ -54,7 +48,7 @@ async function doConnect() {
   clearTimeout(retryTimer);
   const s = await settings();
   if (s.name && !validName(s.name)) {
-    await setStatus("off", "名字只用文字、数字、- 和 _");
+    await setStatus("off", t("close4002"));
     return;
   }
   // Refused (4005) or removed (4003) in Kiki: don't ask again on every Chrome start or keepalive alarm;
@@ -68,7 +62,7 @@ async function doConnect() {
   try {
     sock = new WebSocket(s.server);
   } catch {
-    await setStatus("error", "Kiki 地址不对，应该像 ws://127.0.0.1:4567/ext");
+    await setStatus("error", t("badServer"));
     return scheduleRetry();
   }
   ws = sock;
@@ -88,7 +82,7 @@ async function doConnect() {
     if (ev.code === 4001 && !s.token) return setStatus("error", OLD_KIKI);
     const fatal = CLOSE_REASONS[ev.code];
     if (fatal) return setStatus("error", fatal);
-    setStatus("error", "连不上 Kiki：确认 Kiki 开着，地址没填错");
+    setStatus("error", t("cantReach"));
     scheduleRetry();
   };
 }

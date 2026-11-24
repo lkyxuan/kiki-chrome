@@ -1,0 +1,130 @@
+{
+  "extName": {
+    "message": "Kiki 浏览器"
+  },
+  "extDesc": {
+    "message": "让这台 Mac 上的 Kiki 使用这个 Chrome Profile（一个 Profile 一个账号）。"
+  },
+  "stConnected": {
+    "message": "已连上 Kiki"
+  },
+  "stConnecting": {
+    "message": "正在连接…"
+  },
+  "stWaiting": {
+    "message": "等你在 Kiki 里点同意"
+  },
+  "stError": {
+    "message": "没连上"
+  },
+  "stOff": {
+    "message": "没连接"
+  },
+  "stNamed": {
+    "message": "，这个浏览器叫「$VALUE$」",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "stWaitingDetail": {
+    "message": "：到 Kiki → 设置 → 浏览器，同意「$VALUE$」",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "newBrowser": {
+    "message": "新浏览器"
+  },
+  "btnConnect": {
+    "message": "连接"
+  },
+  "btnReconnect": {
+    "message": "重新连接"
+  },
+  "btnReapply": {
+    "message": "重新申请"
+  },
+  "btnWaiting": {
+    "message": "等你同意…"
+  },
+  "btnConnected": {
+    "message": "连上了 ✓"
+  },
+  "btnConnecting": {
+    "message": "连接中…"
+  },
+  "badName": {
+    "message": "名字只用文字、数字、- 和 _，最多 40 个字"
+  },
+  "slow": {
+    "message": "10 秒还没连上：确认这台电脑上 Kiki 开着、已经更新到最新版"
+  },
+  "lblName": {
+    "message": "这个浏览器叫什么"
+  },
+  "phName": {
+    "message": "不填的话 Kiki 会起名"
+  },
+  "hintName": {
+    "message": "只用文字、数字、- 和 _。在 Kiki 里点同意时也能改。"
+  },
+  "hintAuto": {
+    "message": "装好会自己去找 Kiki，到 Kiki → 设置 → 浏览器 点同意就连上了。"
+  },
+  "advanced": {
+    "message": "高级"
+  },
+  "lblServer": {
+    "message": "Kiki 地址"
+  },
+  "hintServer": {
+    "message": "别的电脑上的 Kiki：填 Kiki 设置 → 浏览器 里「别的电脑填」那个地址。"
+  },
+  "lblToken": {
+    "message": "配对码（备用）"
+  },
+  "phToken": {
+    "message": "在 Kiki 设置 → 浏览器 里复制"
+  },
+  "hintToken": {
+    "message": "点同意不方便时用，只在 Kiki 那台电脑上有效。"
+  },
+  "close4001": {
+    "message": "配对码不对，到 Kiki 设置 → 浏览器 里重新复制"
+  },
+  "close4002": {
+    "message": "名字不行：只用文字、数字、- 和 _"
+  },
+  "close4003": {
+    "message": "在 Kiki 里被删掉了，点「连接」重新申请"
+  },
+  "close4004": {
+    "message": "另一个 Profile 也叫这个名字，换一个名字"
+  },
+  "close4005": {
+    "message": "在 Kiki 里被拒绝了；要连就点「连接」重新申请"
+  },
+  "close4006": {
+    "message": "Kiki 那边等同意的浏览器太多了，先去 Kiki 设置 → 浏览器 处理一下"
+  },
+  "close4007": {
+    "message": "配对码只能在 Kiki 那台电脑上用；别的电脑请清空配对码，点「连接」后去 Kiki 里点同意"
+  },
+  "oldKiki": {
+    "message": "这个 Kiki 版本还不能点同意：先更新 Kiki，或在「高级」里填配对码"
+  },
+  "badServer": {
+    "message": "Kiki 地址不对，应该像 ws://127.0.0.1:4567/ext"
+  },
+  "cantReach": {
+    "message": "连不上 Kiki：确认 Kiki 开着，地址没填错"
+  },
+  "detailSep": {
+    "message": "：",
+    "description": "Between a status and its reason"
+  }
+}

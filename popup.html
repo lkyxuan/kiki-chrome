@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <title>Kiki</title>
@@ -26,24 +26,24 @@
 </head>
 <body>
   <h1><i></i>Kiki</h1>
-  <div class="status"><span class="dot" id="dot"></span><span id="status">未连接</span></div>
+  <div class="status"><span class="dot" id="dot"></span><span id="status"></span></div>
 
-  <label for="name">这个浏览器叫什么</label>
-  <input id="name" placeholder="不填的话 Kiki 会起名" maxlength="40">
-  <div class="hint">只用文字、数字、- 和 _。在 Kiki 里点同意时也能改。</div>
-  <div class="hint">装好会自己去找 Kiki，到 Kiki → 设置 → 浏览器 点同意就连上了。</div>
+  <label for="name" data-i18n="lblName"></label>
+  <input id="name" data-i18n-placeholder="phName" maxlength="40">
+  <div class="hint" data-i18n="hintName"></div>
+  <div class="hint" data-i18n="hintAuto"></div>
 
   <details id="adv">
-    <summary>高级</summary>
-    <label for="server">Kiki 地址</label>
+    <summary data-i18n="advanced"></summary>
+    <label for="server" data-i18n="lblServer"></label>
     <input id="server" placeholder="ws://127.0.0.1:4567/ext">
-    <div class="hint">别的电脑上的 Kiki：填 Kiki 设置 → 浏览器 里「别的电脑填」那个地址。</div>
-    <label for="token">配对码（备用）</label>
-    <input id="token" placeholder="在 Kiki 设置 → 浏览器 里复制" autocomplete="off">
-    <div class="hint">点同意不方便时用，只在 Kiki 那台电脑上有效。</div>
+    <div class="hint" data-i18n="hintServer"></div>
+    <label for="token" data-i18n="lblToken"></label>
+    <input id="token" data-i18n-placeholder="phToken" autocomplete="off">
+    <div class="hint" data-i18n="hintToken"></div>
   </details>
 
-  <button id="save">连接</button>
+  <button id="save" data-i18n="btnConnect"></button>
   <script src="src/popup.js" type="module"></script>
 </body>
 </html>

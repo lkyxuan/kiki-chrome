@@ -11,7 +11,8 @@ Install it in every Chrome profile you want Kiki to use. Each copy connects to K
 3. That's it: the extension finds Kiki on its own. In Kiki → Settings → Browsers a row "新浏览器想连上" appears; give it a name and click 同意. Kiki hands this browser its own key, so it reconnects by itself from then on.
    - Kiki on another computer (over Tailscale): click the Kiki icon → 高级, paste the address shown in Kiki's Settings → Browsers ("别的电脑填"), then approve in Kiki.
    - Fallback on the same Mac: paste the pairing code from Kiki → Settings → Browsers into 高级 → 配对码.
-4. The icon shows no badge when connected, `…` while connecting or waiting for approval and `!` when it cannot reach Kiki.
+4. The extension speaks English by default and Chinese when Chrome's language is Chinese (texts in `_locales/`).
+5. The icon shows no badge when connected, `…` while connecting or waiting for approval and `!` when it cannot reach Kiki.
 
 ## How it works
 

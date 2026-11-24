@@ -33,7 +33,7 @@ addEventListener("click",e=>{seen.trusted&&=e.isTrusted},true);</script>`;
   const call = (action, params = {}) => new Promise((res) => { const id = nextId++; pending.set(id, res); sock.send(JSON.stringify({ type: "call", id, action, params })); });
 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kc-"));
-  const ctx = await chromium.launchPersistentContext(dir, { headless: true, channel: "chromium", args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`] });
+  const ctx = await chromium.launchPersistentContext(dir, { headless: true, channel: "chromium", args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`, `--lang=zh-CN`] });
   let [sw] = ctx.serviceWorkers(); if (!sw) sw = await ctx.waitForEvent("serviceworker");
   await sw.evaluate(() => chrome.storage.local.set({ name: "浏览器1", token: "abc", server: "ws://127.0.0.1:8712/ext" }));
   await Promise.race([connected, new Promise((_, j) => setTimeout(() => j(new Error("no connect")), 10000))]);
@@ -107,7 +107,7 @@ addEventListener("click",e=>{seen.trusted&&=e.isTrusted},true);</script>`;
   }));
   const until = async (f, ms = 8000) => { const t = Date.now(); while (!(await f())) { if (Date.now() - t > ms) return false; await new Promise((r) => setTimeout(r, 100)); } return true; };
   const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), "kc-"));
-  const ctx2 = await chromium.launchPersistentContext(dir2, { headless: true, channel: "chromium", args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`] });
+  const ctx2 = await chromium.launchPersistentContext(dir2, { headless: true, channel: "chromium", args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`, `--lang=zh-CN`] });
   let [sw2] = ctx2.serviceWorkers(); if (!sw2) sw2 = await ctx2.waitForEvent("serviceworker");
   await sw2.evaluate(() => chrome.storage.local.set({ server: "ws://127.0.0.1:8713/ext" }));
   const asked = await until(() => hellos.length >= 1);
