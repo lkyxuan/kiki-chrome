@@ -172,8 +172,11 @@ export function findText(words) {
   const target = (el) => {
     const hit = el.closest?.(SEL);
     if (hit) return hit;
+    // a container that also holds other controls (a toolbar) isn't this button: stop below it
+    const others = (x) => [...x.querySelectorAll(SEL), ...(x.shadowRoot ? x.shadowRoot.querySelectorAll(SEL) : [])].some((c) => !c.contains(el) && !el.contains(c));
     let best = el;
     for (let x = el, i = 0; x && x.nodeType === 1 && i < 6; x = x.parentElement || x.getRootNode()?.host, i++) {
+      if (x !== el && others(x)) break;
       if (x.matches?.(SEL)) return x;
       if (getComputedStyle(x).cursor === "pointer") best = x;
       else if (best !== el) break;

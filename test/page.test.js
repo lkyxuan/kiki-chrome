@@ -119,3 +119,10 @@ test("upload marking reaches a file input inside an open shadow root, and unmark
     assert.equal(await p.evaluate(page.deepQuery("data-ktest")), null);
   });
 });
+
+test("findText doesn't climb to a pointer toolbar that also holds other controls", async (t) => {
+  await withPage(t, `<div id="bar" style="cursor:pointer"><div id="pub" style="display:inline-block;padding:4px">Publish</div><button>Other</button></div>`, async (p) => {
+    const r = await p.evaluate(`(${page.findText.toString()})("Publish")`);
+    assert.equal(await p.evaluate((ref) => globalThis.__kikiRefs[ref].deref().id, r.ref), "pub");
+  });
+});
