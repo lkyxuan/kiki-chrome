@@ -14,6 +14,7 @@ export const ACTIONS = {
   close: { tab: true },
   snapshot: { tab: true },
   describe: { tab: true, need: ["ref"] },
+  find: { tab: true, need: ["text"] },
   click: { tab: true, need: ["ref"] },
   type: { tab: true, need: ["text"] },
   key: { tab: true, need: ["key"] },
