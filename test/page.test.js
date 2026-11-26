@@ -100,3 +100,22 @@ test("findText finds a button by its words: exact over partial, the clickable an
     },
   );
 });
+
+test("a custom-element button stays listed inside a pointer container that has a native button (the container isn't listed)", async (t) => {
+  await withPage(t, `<div style="cursor:pointer"><button>Other</button><x-tab style="display:inline-block">Publish</x-tab></div>`, async (p) => {
+    const r = await p.evaluate(`(${page.snapshotPage.toString()})(500)`);
+    assert.deepEqual(r.elements.map((e) => e.name), ["Other", "Publish"]);
+  });
+});
+
+test("upload marking reaches a file input inside an open shadow root, and unmark clears it", async (t) => {
+  await withPage(t, `<x-up style="display:block"></x-up>`, async (p) => {
+    await p.evaluate(() => (document.querySelector("x-up").attachShadow({ mode: "open" }).innerHTML = `<input type="file" accept="image/*">`));
+    const r = await p.evaluate(`(${page.snapshotPage.toString()})(500)`);
+    const ref = r.elements.find((e) => e.role === "file").ref;
+    await p.evaluate(`(${page.markRef.toString()})(${ref}, "data-ktest")`);
+    assert.equal(await p.evaluate(`${page.deepQuery("data-ktest")}?.type`), "file");
+    await p.evaluate(`(${page.unmarkRef.toString()})("data-ktest")`);
+    assert.equal(await p.evaluate(page.deepQuery("data-ktest")), null);
+  });
+});

@@ -1,7 +1,7 @@
 // Service worker: keeps one WebSocket to Kiki on this Mac and runs the actions Kiki sends,
 // only inside tabs this extension opened (the "Kiki" tab group).
 import { ACTIONS, DEBUGGER_IDLE_MS, DEFAULT_SERVER, GROUP_TITLE, HEARTBEAT_MS, backoff, charKeyEvent, clickPoint, fail, hello, keyEvent, mousePath, ok, newInstallId, parseCall, typingPlan, validName } from "./protocol.js";
-import { findText, locate, markRef, snapshotPage, unmarkRef } from "./page.js";
+import { deepQuery, findText, locate, markRef, snapshotPage, unmarkRef } from "./page.js";
 
 const VERSION = chrome.runtime.getManifest().version;
 let ws = null;
@@ -357,7 +357,7 @@ async function run(action, p) {
       const marked = await inPage(p.tabId, markRef, p.ref, attr);
       if (!marked || marked.error) throw new Error(marked?.error || `no element ${p.ref}; take a new snapshot`);
       try {
-        const { result } = await cdp(p.tabId, "Runtime.evaluate", { expression: `document.querySelector(${JSON.stringify(`[${attr}]`)})` });
+        const { result } = await cdp(p.tabId, "Runtime.evaluate", { expression: deepQuery(attr) });
         if (!result?.objectId) throw new Error(`no element ${p.ref}; take a new snapshot`);
         await cdp(p.tabId, "DOM.setFileInputFiles", { objectId: result.objectId, files: p.files });
       } finally {

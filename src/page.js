@@ -63,10 +63,17 @@ export function snapshotPage(maxText) {
   // children have it too) that has nothing clickable of its own inside and isn't a whole page section.
   const up = (el) => el.parentElement || el.getRootNode()?.host || null;
   const area = innerWidth * innerHeight;
+  const memo = new Map();
   const clickable = (el) => {
+    if (!memo.has(el)) memo.set(el, isClickable(el));
+    return memo.get(el);
+  };
+  const isClickable = (el) => {
     if (!visible(el) || getComputedStyle(el).cursor !== "pointer") return false;
     const parent = up(el);
-    if (parent && parent.nodeType === 1 && getComputedStyle(parent).cursor === "pointer") return false;
+    // under a pointer parent: a plain element only inherited the cursor; a custom element is skipped only if
+    // that parent gets listed itself (a pointer container with a native button inside doesn't, so keep it)
+    if (parent && parent.nodeType === 1 && getComputedStyle(parent).cursor === "pointer" && (!el.tagName.includes("-") || clickable(parent))) return false;
     if (el.querySelector(SEL) || el.shadowRoot?.querySelector?.(SEL)) return false;
     const r = el.getBoundingClientRect();
     if (r.width * r.height > area * 0.25) return false;
@@ -223,5 +230,14 @@ export function markRef(ref, attr) {
 }
 
 export function unmarkRef(attr) {
-  for (const el of document.querySelectorAll(`[${attr}]`)) el.removeAttribute(attr);
+  // the element may sit inside an open shadow root, which querySelectorAll doesn't reach
+  const sweep = (root) => {
+    for (const el of root.querySelectorAll(`[${attr}]`)) el.removeAttribute(attr);
+    for (const el of root.querySelectorAll("*")) if (el.shadowRoot) sweep(el.shadowRoot);
+  };
+  sweep(document);
 }
+
+/** Expression for the debugger to find the marked element, looking into open shadow roots too. */
+export const deepQuery = (attr) =>
+  `(function f(root){const hit=root.querySelector(${JSON.stringify(`[${attr}]`)});if(hit)return hit;for(const el of root.querySelectorAll("*")){if(el.shadowRoot){const x=f(el.shadowRoot);if(x)return x}}return null})(document)`;
