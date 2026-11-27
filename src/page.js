@@ -222,6 +222,51 @@ export function locate(ref) {
 }
 
 /**
+ * What sits at a spot of the window (viewport CSS pixels, the same frame as the screenshot): looks into open
+ * shadow roots, climbs to the clickable thing, and says what it reads, so Kiki can check "发布" before clicking.
+ */
+export function pointInfo(x, y) {
+  let el = document.elementFromPoint(x, y);
+  if (!el) return { error: `nothing at ${Math.round(x)},${Math.round(y)}; take a new screenshot` };
+  while (el.shadowRoot) {
+    const inner = el.shadowRoot.elementFromPoint(x, y);
+    if (!inner || inner === el) break;
+    el = inner;
+  }
+  const host = (e) => e.parentElement || e.getRootNode()?.host || null;
+  let hit = el;
+  for (let e = el; e; e = host(e)) {
+    if (e.matches?.("a[href], button, input, select, textarea, summary, label, [role=button], [role=link], [onclick], [tabindex]:not([tabindex='-1'])")) { hit = e; break; }
+    if (getComputedStyle(e).cursor === "pointer") hit = e;
+  }
+  const text = (e) => (e.getAttribute?.("aria-label") || e.innerText || e.value || e.getAttribute?.("title") || "").replace(/\s+/g, " ").trim();
+  // only what the target itself says: an unlabeled closed component stays unnamed (Kiki then asks), never a neighbour's words
+  const name = text(hit);
+  return { x, y, vw: window.innerWidth, vh: window.innerHeight, name: name.slice(0, 80), tag: hit.tagName.toLowerCase(), type: hit.type || "" };
+}
+
+/**
+ * Upload without the "Allow access to file URLs" switch: Kiki sends the files' bytes (base64), the page gets
+ * them as real File objects on the input, then the same input/change events a file picker fires.
+ */
+export function putFiles(ref, blobs) {
+  const el = globalThis.__kikiRefs?.[Number(ref)]?.deref();
+  if (!el || !el.isConnected) return { error: `no element ${ref}; take a new snapshot` };
+  if (!(el instanceof HTMLInputElement) || el.type !== "file") return { error: `element ${ref} is not a file input; use the upload box (input type=file)` };
+  const dt = new DataTransfer();
+  for (const b of blobs) {
+    const bin = atob(b.data);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    dt.items.add(new File([bytes], b.name, { type: b.type || "application/octet-stream", lastModified: Date.now() }));
+  }
+  el.files = dt.files;
+  el.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+  return { ok: true, count: el.files.length };
+}
+
+/**
  * Upload needs a handle the debugger can see, so the element gets a one-off random attribute
  * for the moment of the upload; unmarkRef takes it off again right after.
  */

@@ -1,7 +1,7 @@
 // Service worker: keeps one WebSocket to Kiki on this Mac and runs the actions Kiki sends,
 // only inside tabs this extension opened (the "Kiki" tab group).
 import { ACTIONS, DEBUGGER_IDLE_MS, DEFAULT_SERVER, GROUP_TITLE, HEARTBEAT_MS, backoff, charKeyEvent, clickPoint, fail, hello, keyEvent, mousePath, ok, newInstallId, parseCall, typingPlan, validName } from "./protocol.js";
-import { deepQuery, findText, locate, markRef, snapshotPage, unmarkRef } from "./page.js";
+import { deepQuery, findText, locate, markRef, pointInfo, putFiles, snapshotPage, unmarkRef } from "./page.js";
 
 const VERSION = chrome.runtime.getManifest().version;
 let ws = null;
@@ -234,6 +234,14 @@ async function point(tabId, ref) {
   return p;
 }
 
+/** A spot on the screenshot (viewport CSS pixels, see screenshot) and what is there. */
+async function spot(tabId, x, y) {
+  const p = await inPage(tabId, pointInfo, Number(x), Number(y));
+  if (!p || p.error) throw new Error(p?.error || `nothing at ${x},${y}`);
+  if (x > p.vw || y > p.vh) throw new Error(`${x},${y} is outside the window (${p.vw}×${p.vh}); take a new screenshot`);
+  return p;
+}
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const between = (lo, hi) => lo + Math.round(Math.random() * (hi - lo));
 
@@ -314,10 +322,20 @@ async function run(action, p) {
       return r;
     }
     case "describe": {
+      if (p.ref === undefined) {
+        const { name, tag, type } = await spot(p.tabId, p.x, p.y);
+        return { x: p.x, y: p.y, name, tag, type };
+      }
       const { name, tag, type } = await point(p.tabId, p.ref);
       return { ref: p.ref, name, tag, type };
     }
     case "click": {
+      if (p.ref === undefined) {
+        // a button seen on the screenshot but missing from the list (canvas, closed web component): press right there
+        const at = await spot(p.tabId, p.x, p.y);
+        await mouseClick(p.tabId, { x: Number(p.x), y: Number(p.y), w: 4, h: 4, vw: at.vw, vh: at.vh });
+        return { clicked: [p.x, p.y], name: at.name };
+      }
       const box = await point(p.tabId, p.ref);
       await mouseClick(p.tabId, box);
       return { clicked: p.ref, name: box.name };
@@ -352,6 +370,15 @@ async function run(action, p) {
       return { scrolled: dy };
     }
     case "upload": {
+      // Chrome only lets the debugger hand over local files when "Allow access to file URLs" is on for this
+      // extension (off by default for store installs). Without it, use the bytes Kiki sent along.
+      const fileAccess = await chrome.extension.isAllowedFileSchemeAccess();
+      if (!fileAccess) {
+        if (!Array.isArray(p.blobs) || p.blobs.length !== p.files.length) throw new Error("NO_FILE_ACCESS: this Kiki is too old to send files without the extension's \"Allow access to file URLs\" switch; update Kiki, or turn that switch on in chrome://extensions → Kiki → Details");
+        const r = await inPage(p.tabId, putFiles, p.ref, p.blobs);
+        if (!r || r.error) throw new Error(r?.error || "upload failed");
+        return { uploaded: r.count };
+      }
       // the element gets a random one-off attribute only for the moment the debugger needs to find it
       const attr = `data-k${crypto.randomUUID().slice(0, 8)}`;
       const marked = await inPage(p.tabId, markRef, p.ref, attr);
@@ -368,8 +395,12 @@ async function run(action, p) {
     case "screenshot": {
       const tab = await chrome.tabs.get(p.tabId);
       if (!tab.active) await chrome.tabs.update(p.tabId, { active: true });
-      const { data } = await cdp(p.tabId, "Page.captureScreenshot", { format: "jpeg", quality: 70 });
-      return { mime: "image/jpeg", data };
+      // in CSS pixels (not the screen's 2x), so a spot on this picture is the x/y click and describe take
+      const { cssVisualViewport: v } = await cdp(p.tabId, "Page.getLayoutMetrics");
+      const dpr = (await inPage(p.tabId, () => window.devicePixelRatio)) || 1;
+      const width = Math.round(v.clientWidth), height = Math.round(v.clientHeight);
+      const { data } = await cdp(p.tabId, "Page.captureScreenshot", { format: "jpeg", quality: 70, clip: { x: v.pageX, y: v.pageY, width, height, scale: 1 / dpr } });
+      return { mime: "image/jpeg", data, width, height };
     }
     case "eval": {
       const r = await cdp(p.tabId, "Runtime.evaluate", { expression: String(p.expression), returnByValue: true, awaitPromise: true });

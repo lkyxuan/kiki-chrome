@@ -126,3 +126,41 @@ test("findText doesn't climb to a pointer toolbar that also holds other controls
     assert.equal(await p.evaluate((ref) => globalThis.__kikiRefs[ref].deref().id, r.ref), "pub");
   });
 });
+
+test("pointInfo says what sits at a screenshot spot: through open shadow roots up to the clickable thing; a closed web component reads as itself", async (t) => {
+  await withPage(
+    t,
+    `<style>body{margin:0}</style>
+     <div style="height:40px"><button id="b" style="width:100px;height:40px"><span>发布</span></button></div>
+     <x-open style="display:block;height:40px"></x-open>
+     <div><button>Save draft</button><x-closed style="display:block;width:80px;height:40px;cursor:pointer"></x-closed></div>`,
+    async (p) => {
+      await p.evaluate(() => (document.querySelector("x-open").attachShadow({ mode: "open" }).innerHTML = "<div role=button style=\"height:40px\">暂存离开</div>"));
+      await p.evaluate(() => (document.querySelector("x-closed").attachShadow({ mode: "closed" }).innerHTML = "<div style=\"height:40px\">发布</div>"));
+      const at = (x, y) => p.evaluate(`(${page.pointInfo.toString()})(${x}, ${y})`);
+      const b = await at(30, 20);
+      assert.deepEqual([b.tag, b.name], ["button", "发布"], "the span inside climbs to its button");
+      const o = await at(30, 60);
+      assert.deepEqual([o.tag, o.name], ["div", "暂存离开"], "looks inside an open shadow root");
+      const c = await p.evaluate(`(${page.pointInfo.toString()})(...(() => { const r = document.querySelector("x-closed").getBoundingClientRect(); return [r.left + 10, r.top + 10]; })())`);
+      assert.equal(c.tag, "x-closed", "a closed one is only its host; Kiki asks before clicking an unnamed spot");
+      assert.equal(c.name, "", "never borrows the neighbouring button's words");
+      assert.ok(c.vw > 0 && c.vh > 0);
+    },
+  );
+});
+
+test("putFiles puts sent bytes on a file input as real files and fires change", async (t) => {
+  await withPage(t, `<input type="file" multiple><div id="out"></div>`, async (p) => {
+    await p.evaluate(() => {
+      const i = document.querySelector("input");
+      globalThis.__kikiRefs = [, new WeakRef(i), new WeakRef(document.getElementById("out"))];
+      i.addEventListener("change", async () => (document.getElementById("out").textContent = [...i.files].map((f) => `${f.name}:${f.type}:${f.size}`).join(",")));
+    });
+    const r = await p.evaluate(`(${page.putFiles.toString()})(1, [{ name: "a.png", type: "image/png", data: "iVBORw0K" }, { name: "b.txt", data: "aGk=" }])`);
+    assert.deepEqual(r, { ok: true, count: 2 });
+    assert.equal(await p.textContent("#out"), "a.png:image/png:6,b.txt:application/octet-stream:2");
+    const bad = await p.evaluate(`(${page.putFiles.toString()})(2, [])`);
+    assert.match(bad.error, /not a file input/);
+  });
+});
