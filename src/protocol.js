@@ -13,9 +13,9 @@ export const ACTIONS = {
   navigate: { tab: true, need: ["url"] },
   close: { tab: true },
   snapshot: { tab: true },
-  describe: { tab: true, need: ["ref"] },
+  describe: { tab: true, at: true },
   find: { tab: true, need: ["text"] },
-  click: { tab: true, need: ["ref"] },
+  click: { tab: true, at: true },
   type: { tab: true, need: ["text"] },
   key: { tab: true, need: ["key"] },
   scroll: { tab: true },
@@ -41,12 +41,21 @@ export function parseCall(raw) {
   if (!spec) throw new Error(`unknown action: ${m.action}`);
   const params = m.params && typeof m.params === "object" ? m.params : {};
   if (spec.tab && !Number.isInteger(params.tabId)) throw new Error(`${m.action} needs tabId`);
+  // at: a ref from the element list, or x/y = a spot on the latest screenshot (for buttons the list can't see)
+  if (spec.at) {
+    const hasXY = Number.isFinite(params.x) && Number.isFinite(params.y);
+    if (params.ref === undefined && !hasXY) throw new Error(`${m.action} needs ref, or x and y`);
+    if (hasXY && (params.x < 0 || params.y < 0)) throw new Error("x and y must be on the screenshot");
+  }
   for (const k of spec.need || []) {
     if (params[k] === undefined || params[k] === "") throw new Error(`${m.action} needs ${k}`);
   }
   if (params.url !== undefined && !/^https?:\/\//i.test(String(params.url))) throw new Error("url must start with http:// or https://");
   if (params.files !== undefined && (!Array.isArray(params.files) || !params.files.every((f) => typeof f === "string" && f.startsWith("/")))) {
     throw new Error("files must be a list of absolute paths");
+  }
+  if (params.blobs !== undefined && (!Array.isArray(params.blobs) || !params.blobs.every((b) => b && typeof b.name === "string" && typeof b.data === "string"))) {
+    throw new Error("blobs must be a list of { name, type, data (base64) }");
   }
   return { id: m.id, action: m.action, params };
 }

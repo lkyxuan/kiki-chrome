@@ -122,3 +122,12 @@ test("install ids are random and fit what Kiki accepts", () => {
   assert.match(a, /^[A-Za-z0-9_-]{8,64}$/);
   assert.notEqual(a, newInstallId());
 });
+
+test("click and describe take a ref or a screenshot spot; upload blobs are checked", () => {
+  assert.deepEqual(parseCall({ type: "call", id: 1, action: "click", params: { tabId: 3, x: 120, y: 40 } }).params, { tabId: 3, x: 120, y: 40 });
+  assert.ok(parseCall({ type: "call", id: 1, action: "describe", params: { tabId: 3, x: 1, y: 2 } }));
+  assert.throws(() => parseCall({ type: "call", id: 1, action: "click", params: { tabId: 3 } }), /needs ref, or x and y/);
+  assert.throws(() => parseCall({ type: "call", id: 1, action: "click", params: { tabId: 3, x: 5 } }), /needs ref, or x and y/);
+  assert.throws(() => parseCall({ type: "call", id: 1, action: "click", params: { tabId: 3, x: -1, y: 5 } }), /on the screenshot/);
+  assert.throws(() => parseCall({ type: "call", id: 1, action: "upload", params: { tabId: 3, ref: 1, files: ["/a"], blobs: [{ name: "a" }] } }), /blobs/);
+});
