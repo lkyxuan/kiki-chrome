@@ -43,10 +43,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "${{ steps.ver.outputs.tag }}" >/dev/null 2>&1; then echo "done=1" >> "$GITHUB_OUTPUT"; echo "already released"; fi
-      - if: steps.seen.outputs.done != '1'
-        run: npm test
+      - run: npm test
       - name: Pack
-        if: steps.seen.outputs.done != '1'
         id: pack
         run: echo "zip=$(scripts/pack.sh)" >> "$GITHUB_OUTPUT"
       - name: Publish release
@@ -63,8 +61,10 @@ jobs:
       # Chrome Web Store: upload the same zip to the existing item and submit it for review (listing,
       # screenshots and privacy answers stay as they are). Needs repo secrets CWS_CLIENT_ID,
       # CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN (see README "Chrome Web Store"); skipped without them.
+      # Already on Releases (store step failed last time, or secrets added later): press "Run workflow"
+      # to submit that version to the store again.
       - name: Submit to Chrome Web Store
-        if: steps.seen.outputs.done != '1' && env.CWS_REFRESH_TOKEN != ''
+        if: env.CWS_REFRESH_TOKEN != '' && (steps.seen.outputs.done != '1' || github.event_name == 'workflow_dispatch')
         env:
           CWS_ITEM: ljmhepikeflncdaolonniphfcihpcgic
         run: |
