@@ -48,3 +48,16 @@ The `release` workflow checks the versions match, runs the tests, packs `kiki-ch
 ## License
 
 MIT
+
+## Chrome Web Store
+
+Merging a version bump (manifest.json + package.json) to main runs `release`: it packs the zip, puts it on Releases, and
+uploads it to the store item `ljmhepikeflncdaolonniphfcihpcgic` and submits it for review. The listing, screenshots and
+privacy answers stay as they are; Google still reviews every version. The store step runs only when these repo secrets are set
+(one-time setup by the publisher account):
+
+1. Google Cloud console → enable "Chrome Web Store API" → OAuth consent screen (External; press "Publish app" so it is "In production", otherwise the refresh token dies after 7 days) →
+   Credentials → OAuth client ID, type "Web application", with `https://developers.google.com/oauthplayground` as an authorized redirect URI. Save `CWS_CLIENT_ID` and `CWS_CLIENT_SECRET`.
+2. Get a refresh token for scope `https://www.googleapis.com/auth/chromewebstore` with that client (signed in as the
+   publisher), e.g. with the OAuth Playground (gear → "Use your own OAuth credentials"). Save it as `CWS_REFRESH_TOKEN`.
+3. If a store submission failed, or the secrets were added after a version was already on Releases, press "Run workflow" on the `release` action: it skips Releases and submits that version to the store again.

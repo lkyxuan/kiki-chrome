@@ -1,15 +1,22 @@
 name: release
-# Push a tag like v0.1.2, or press "Run workflow" on the Actions page (it tags main with
-# the version in manifest.json), and this packs the extension and publishes it on Releases.
+# Runs by itself when a merge to main changes the version in manifest.json (or push a tag like
+# v0.1.2, or press "Run workflow"): packs the extension, publishes it on Releases, and, when the
+# CWS_* secrets are set, uploads it to the Chrome Web Store and submits it for review.
 on:
   push:
     tags: ['v*']
+    branches: [main]
+    paths: [manifest.json]
   workflow_dispatch:
 permissions:
   contents: write
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+      CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+      CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -18,7 +25,7 @@ jobs:
       - name: Tag must match manifest.json and package.json
         id: ver
         run: |
-          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+          if [ "$GITHUB_REF_TYPE" != tag ]; then
             tag=$(node -p "require('./manifest.json').version")
           else
             tag="${GITHUB_REF_NAME#v}"
@@ -30,11 +37,18 @@ jobs:
             echo "tag v$tag, manifest.json $m, package.json $p: bump both before tagging" >&2
             exit 1
           fi
+      - name: Skip if this version is already released
+        id: seen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ steps.ver.outputs.tag }}" >/dev/null 2>&1; then echo "done=1" >> "$GITHUB_OUTPUT"; echo "already released"; fi
       - run: npm test
       - name: Pack
         id: pack
         run: echo "zip=$(scripts/pack.sh)" >> "$GITHUB_OUTPUT"
       - name: Publish release
+        if: steps.seen.outputs.done != '1'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -44,3 +58,25 @@ jobs:
             --title "kiki-chrome $tag" \
             --generate-notes \
             --notes "下载 kiki-chrome-${tag#v}.zip，解压后在每个 Chrome Profile 的 chrome://extensions 里「加载已解压的扩展程序」选这个文件夹；升级就解压到原来的文件夹覆盖，再点刷新。"
+      # Chrome Web Store: upload the same zip to the existing item and submit it for review (listing,
+      # screenshots and privacy answers stay as they are). Needs repo secrets CWS_CLIENT_ID,
+      # CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN (see README "Chrome Web Store"); skipped without them.
+      # Already on Releases (store step failed last time, or secrets added later): press "Run workflow"
+      # to submit that version to the store again.
+      - name: Submit to Chrome Web Store
+        if: env.CWS_REFRESH_TOKEN != '' && (steps.seen.outputs.done != '1' || github.event_name == 'workflow_dispatch')
+        env:
+          CWS_ITEM: ljmhepikeflncdaolonniphfcihpcgic
+        run: |
+          set -euo pipefail
+          token=$(curl -sf https://oauth2.googleapis.com/token \
+            --data-urlencode "client_id=$CWS_CLIENT_ID" --data-urlencode "client_secret=$CWS_CLIENT_SECRET" \
+            --data-urlencode "refresh_token=$CWS_REFRESH_TOKEN" -d grant_type=refresh_token | node -pe 'JSON.parse(require("fs").readFileSync(0)).access_token')
+          up=$(curl -s -X PUT -H "Authorization: Bearer $token" -H "x-goog-api-version: 2" \
+            -T "${{ steps.pack.outputs.zip }}" "https://www.googleapis.com/upload/chromewebstore/v1.1/items/$CWS_ITEM")
+          echo "upload: $up"
+          echo "$up" | grep -q '"uploadState": *"SUCCESS"' || { echo "upload failed" >&2; exit 1; }
+          pub=$(curl -s -X POST -H "Authorization: Bearer $token" -H "x-goog-api-version: 2" -H "Content-Length: 0" \
+            "https://www.googleapis.com/chromewebstore/v1.1/items/$CWS_ITEM/publish")
+          echo "publish: $pub"
+          echo "$pub" | grep -Eq '"(OK|ITEM_PENDING_REVIEW)"' || { echo "submit failed" >&2; exit 1; }
