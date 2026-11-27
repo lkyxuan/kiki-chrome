@@ -133,7 +133,7 @@ test("pointInfo says what sits at a screenshot spot: through open shadow roots u
     `<style>body{margin:0}</style>
      <div style="height:40px"><button id="b" style="width:100px;height:40px"><span>发布</span></button></div>
      <x-open style="display:block;height:40px"></x-open>
-     <x-closed style="display:block;width:80px;height:40px;cursor:pointer"></x-closed>`,
+     <div><button>Save draft</button><x-closed style="display:block;width:80px;height:40px;cursor:pointer"></x-closed></div>`,
     async (p) => {
       await p.evaluate(() => (document.querySelector("x-open").attachShadow({ mode: "open" }).innerHTML = "<div role=button style=\"height:40px\">暂存离开</div>"));
       await p.evaluate(() => (document.querySelector("x-closed").attachShadow({ mode: "closed" }).innerHTML = "<div style=\"height:40px\">发布</div>"));
@@ -142,8 +142,9 @@ test("pointInfo says what sits at a screenshot spot: through open shadow roots u
       assert.deepEqual([b.tag, b.name], ["button", "发布"], "the span inside climbs to its button");
       const o = await at(30, 60);
       assert.deepEqual([o.tag, o.name], ["div", "暂存离开"], "looks inside an open shadow root");
-      const c = await at(30, 100);
+      const c = await p.evaluate(`(${page.pointInfo.toString()})(...(() => { const r = document.querySelector("x-closed").getBoundingClientRect(); return [r.left + 10, r.top + 10]; })())`);
       assert.equal(c.tag, "x-closed", "a closed one is only its host; Kiki asks before clicking an unnamed spot");
+      assert.equal(c.name, "", "never borrows the neighbouring button's words");
       assert.ok(c.vw > 0 && c.vh > 0);
     },
   );

@@ -240,8 +240,8 @@ export function pointInfo(x, y) {
     if (getComputedStyle(e).cursor === "pointer") hit = e;
   }
   const text = (e) => (e.getAttribute?.("aria-label") || e.innerText || e.value || e.getAttribute?.("title") || "").replace(/\s+/g, " ").trim();
-  let name = text(hit);
-  for (let e = hit; !name && e; e = host(e)) name = text(e).length <= 40 ? text(e) : "";
+  // only what the target itself says: an unlabeled closed component stays unnamed (Kiki then asks), never a neighbour's words
+  const name = text(hit);
   return { x, y, vw: window.innerWidth, vh: window.innerHeight, name: name.slice(0, 80), tag: hit.tagName.toLowerCase(), type: hit.type || "" };
 }
 
